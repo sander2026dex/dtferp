@@ -48,6 +48,7 @@ import {
   LogOut,
   Settings,
   Lock,
+  Unlock,
   MessageSquare
 } from 'lucide-react';
 
@@ -61,6 +62,85 @@ export default function App() {
   });
 
   const [currentView, setCurrentView] = useState<'landing' | 'login' | 'register'>('landing');
+
+  // Path routing state (to handle `/admin` and navigation)
+  const [currentPath, setCurrentPath] = useState(() => {
+    return window.location.pathname;
+  });
+
+  // Also track if admin is authenticated via the master password
+  const [isAdminSessionActive, setIsAdminSessionActive] = useState(() => {
+    return sessionStorage.getItem('dtf_admin_authorized') === 'true';
+  });
+
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminLoginError, setAdminLoginError] = useState('');
+
+  // Handle location changes (URL paths and hashes)
+  useEffect(() => {
+    const handleLocationChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+
+    window.addEventListener('popstate', handleLocationChange);
+    
+    // Support hash navigation fallback (for Netlify/SPA compatibility)
+    const handleHashChange = () => {
+      if (window.location.hash === '#/admin' || window.location.hash === '#admin') {
+        setCurrentPath('/admin');
+      } else if (window.location.hash === '#/' || window.location.hash === '') {
+        setCurrentPath('/');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+
+    // Initial check for hash
+    if (window.location.hash === '#/admin' || window.location.hash === '#admin') {
+      setCurrentPath('/admin');
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
+
+  const handleAdminLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminLoginError('');
+    
+    try {
+      const msgBuffer = new TextEncoder().encode(adminPasswordInput);                    
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));             
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      const expectedHash = '1af42ed9bd00df06dc1528192d68f208146d6c42ab2959cd0658c4fa00371e31';
+      
+      if (hashHex === expectedHash) {
+        setIsAdminSessionActive(true);
+        sessionStorage.setItem('dtf_admin_authorized', 'true');
+        setAdminPasswordInput('');
+        
+        // Log them in as default admin@dtf.com if not already logged in
+        const defaultAdmin: UserAccount = {
+          email: 'admin@dtf.com',
+          nome: 'Administrador',
+          celular: '11943152441',
+          passwordHash: 'admin123',
+          createdAt: Date.now(),
+          status: 'active'
+        };
+        setCurrentUser(defaultAdmin);
+        setActiveTab('admin');
+      } else {
+        setAdminLoginError('Senha administrativa incorreta!');
+      }
+    } catch (err) {
+      console.error(err);
+      setAdminLoginError('Erro de processamento na validação da senha.');
+    }
+  };
 
   // Core Workbook States (Loaded dynamically based on currentUser)
   const [custos, setCustos] = useState<Custo[]>([]);
@@ -142,13 +222,18 @@ export default function App() {
     setCurrentUser(null);
     setCurrentView('landing');
     setActiveTab('dashboard');
+    setIsAdminSessionActive(false);
+    sessionStorage.removeItem('dtf_admin_authorized');
+    window.history.pushState(null, '', '/');
+    setCurrentPath('/');
+    window.location.hash = '';
   };
 
   // Check admin status
-  const isAdminUser = currentUser && (
+  const isAdminUser = isAdminSessionActive || (currentUser && (
     currentUser.email.toLowerCase() === 'xboxcarioca@gmail.com' || 
     currentUser.email.toLowerCase() === 'admin@dtf.com'
-  );
+  ));
 
   // --- CRUD OPERATORS ---
 
@@ -283,6 +368,75 @@ export default function App() {
   };
 
   // --- VIEW RENDERING LOGIC ---
+
+  // A. Admin Login Interception (Path matches /admin and session not active)
+  if (currentPath === '/admin' && !isAdminSessionActive) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-center items-center px-6 py-12 font-sans" id="admin-auth-viewport">
+        <div className="max-w-md w-full bg-slate-900 rounded-3xl p-8 border border-slate-800 shadow-2xl space-y-6 relative overflow-hidden">
+          {/* Subtle glowing absolute background gradient */}
+          <div className="absolute -top-10 -left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl"></div>
+          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl"></div>
+
+          <div className="text-center space-y-4 relative">
+            <div className="inline-flex p-4 bg-indigo-600/10 border border-indigo-500/20 rounded-full text-indigo-400">
+              <Lock className="w-8 h-8" />
+            </div>
+            
+            <div className="space-y-1">
+              <span className="text-[10px] font-extrabold text-indigo-400 uppercase tracking-widest block">Sistema de Gestão DTF</span>
+              <h2 className="text-xl font-extrabold tracking-tight text-white font-display">Acesso Administrativo Restrito</h2>
+              <p className="text-xs text-slate-400">
+                Este terminal é de acesso restrito. Insira a senha mestra para gerenciar licenças, usuários e faturamento.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleAdminLoginSubmit} className="space-y-4 relative">
+            {adminLoginError && (
+              <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-semibold rounded-xl text-center">
+                ⚠️ {adminLoginError}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Senha Mestra de Acesso</label>
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••••••"
+                  value={adminPasswordInput}
+                  onChange={(e) => setAdminPasswordInput(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200 font-mono placeholder:text-slate-700"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-extrabold transition-all cursor-pointer shadow-lg shadow-indigo-600/15 flex items-center justify-center gap-2"
+            >
+              <Unlock className="w-4 h-4" /> Autenticar e Acessar
+            </button>
+          </form>
+
+          <div className="text-center pt-2 relative">
+            <button
+              onClick={() => {
+                window.history.pushState(null, '', '/');
+                setCurrentPath('/');
+                window.location.hash = '';
+              }}
+              className="text-xs font-semibold text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              Voltar para a Landpage
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // 1. Not Logged In View Router
   if (!currentUser) {
