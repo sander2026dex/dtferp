@@ -1,0 +1,6 @@
+{
+  "name": "DTF Têxtil ERP",
+  "description": "Sistema de gestão inteligente integrado para estamparias de DTF Têxtil, incluindo Dashboard, Controle de Custos, Controle de Vendas, Catálogo de Produtos, Cadastro de Clientes, Orçamentos e Relatórios.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
