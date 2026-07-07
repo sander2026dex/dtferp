@@ -195,6 +195,37 @@ export default function App() {
     }
   }, [custos, vendas, produtos, clientes, fornecedores, currentUser]);
 
+  // Real-time trial countdown timer state and effect
+  const [trialTimeLeft, setTrialTimeLeft] = useState('');
+
+  useEffect(() => {
+    if (!currentUser || currentUser.status !== 'trial') {
+      setTrialTimeLeft('');
+      return;
+    }
+
+    const updateTimer = () => {
+      const msLeft = (currentUser.createdAt + 24 * 60 * 60 * 1000) - Date.now();
+      if (msLeft <= 0) {
+        setTrialTimeLeft('Expirado');
+        return;
+      }
+
+      const totalSeconds = Math.floor(msLeft / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      setTrialTimeLeft(formatted);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   // Check if current user trial has expired (1 day = 24 hours)
   const isTrialExpired = currentUser && 
     currentUser.status === 'trial' && 
@@ -519,11 +550,21 @@ export default function App() {
       
       {/* Trial simulation banner */}
       {currentUser.status === 'trial' && (
-        <div className="bg-amber-600 text-white text-xs py-2 px-4 flex justify-between items-center gap-4 font-semibold" id="trial-simulation-banner">
-          <span>⏱️ Você está no período de teste de 1 dia grátis. Aproveite todos os recursos!</span>
+        <div className="bg-amber-600 text-white text-xs py-2.5 px-4 flex flex-col md:flex-row justify-between items-center gap-3 font-semibold shadow-inner border-b border-amber-500" id="trial-simulation-banner">
+          <div className="flex flex-col sm:flex-row items-center gap-2 text-center sm:text-left">
+            <span className="flex items-center gap-1.5 bg-amber-700/50 px-2 py-0.5 rounded-md border border-amber-500/40 font-bold uppercase text-[10px]">
+              ⏱️ Período de Teste
+            </span>
+            <span>
+              Você está aproveitando o período de 1 dia grátis! Tempo restante antes de expirar: 
+              <span className="font-mono bg-amber-950/40 px-2 py-0.5 rounded-md font-bold text-[13px] ml-1.5 border border-amber-950/20 text-yellow-100 tracking-wider">
+                {trialTimeLeft || 'Calculando...'}
+              </span>
+            </span>
+          </div>
           <button
             onClick={handleSimulateTrialExpiration}
-            className="px-3 py-1 bg-white hover:bg-slate-100 text-amber-700 font-bold rounded-lg text-[10px] uppercase transition-all cursor-pointer shadow-xs"
+            className="px-3 py-1 bg-white hover:bg-amber-50 text-amber-800 font-extrabold rounded-lg text-[10px] uppercase transition-all cursor-pointer shadow-xs border border-amber-200"
           >
             Simular Expiração de 1 Dia
           </button>
