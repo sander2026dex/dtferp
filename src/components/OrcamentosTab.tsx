@@ -22,10 +22,12 @@ import {
   DollarSign
 } from 'lucide-react';
 import { Cliente, Produto } from '../types';
+import { UserAccount } from '../utils/db';
 
 interface OrcamentosTabProps {
   clientes: Cliente[];
   produtos: Produto[];
+  currentUser?: UserAccount | null;
 }
 
 interface QuoteItem {
@@ -35,7 +37,18 @@ interface QuoteItem {
   valorUnitario: number;
 }
 
-export default function OrcamentosTab({ clientes, produtos }: OrcamentosTabProps) {
+export default function OrcamentosTab({ clientes, produtos, currentUser }: OrcamentosTabProps) {
+  const formatLogoUrl = (url?: string) => {
+    if (!url) return '';
+    const trimmed = url.trim();
+    if (trimmed.includes('drive.google.com')) {
+      const matchId = trimmed.match(/\/file\/d\/([a-zA-Z0-9-_]+)/) || trimmed.match(/id=([a-zA-Z0-9-_]+)/);
+      if (matchId && matchId[1]) {
+        return `https://docs.google.com/uc?export=view&id=${matchId[1]}`;
+      }
+    }
+    return trimmed;
+  };
   // State for Customer selection
   const [selectedClienteId, setSelectedClienteId] = useState<string>('');
   const [customCliente, setCustomCliente] = useState({
@@ -847,12 +860,31 @@ export default function OrcamentosTab({ clientes, produtos }: OrcamentosTabProps
             
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b border-slate-200/85">
-              <div>
-                <h3 className="text-xl font-extrabold text-slate-900 tracking-tight uppercase">SISTEMA DTF TÊXTIL</h3>
-                <p className="text-[11px] text-indigo-600 font-bold uppercase tracking-widest mt-0.5">Estamparia de Alta Definição</p>
-                <div className="text-[10px] text-slate-400 mt-2 font-mono">
-                  <p>CNPJ: 12.345.678/0001-99</p>
-                  <p>Contato: contato@dtftextil.com.br</p>
+              <div className="flex items-start gap-3">
+                {currentUser?.empresaLogo && (
+                  <div className="bg-slate-50 p-1 rounded-lg border border-slate-200/60 shrink-0">
+                    <img 
+                      src={formatLogoUrl(currentUser.empresaLogo)} 
+                      alt="Logo Empresa" 
+                      referrerPolicy="no-referrer"
+                      className="h-12 w-auto max-w-[120px] object-contain rounded"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+                <div>
+                  <h3 className="text-xl font-extrabold text-slate-900 tracking-tight uppercase">
+                    {currentUser?.empresaNome || 'SISTEMA DTF TÊXTIL'}
+                  </h3>
+                  <p className="text-[11px] text-indigo-600 font-bold uppercase tracking-widest mt-0.5">
+                    {currentUser?.empresaNome ? 'Estamparia Personalizada' : 'Estamparia de Alta Definição'}
+                  </p>
+                  <div className="text-[10px] text-slate-400 mt-2 font-mono">
+                    <p>CNPJ: {currentUser?.empresaCnpj || '12.345.678/0001-99'}</p>
+                    <p>Contato: {currentUser?.email || 'contato@dtftextil.com.br'}</p>
+                  </div>
                 </div>
               </div>
 

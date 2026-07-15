@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   TrendingUp, 
@@ -28,6 +28,33 @@ interface LandingPageProps {
 
 export default function LandingPage({ onStartTrial, onGoToLogin }: LandingPageProps) {
   
+  const [timeLeft, setTimeLeft] = useState('00:00:00');
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const midnight = new Date();
+      midnight.setHours(23, 59, 59, 999);
+      
+      const diff = midnight.getTime() - now.getTime();
+      if (diff <= 0) {
+        setTimeLeft('00:00:00');
+        return;
+      }
+      
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      
+      const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      setTimeLeft(formatted);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleWhatsAppRedirect = () => {
     const message = encodeURIComponent("quero comprar sistema do dtf textil");
     window.open(`https://api.whatsapp.com/send?phone=5511943152441&text=${message}`, '_blank');
@@ -75,6 +102,19 @@ export default function LandingPage({ onStartTrial, onGoToLogin }: LandingPagePr
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-indigo-500 selection:text-white" id="landing-container">
       
+      {/* Promo Countdown Banner */}
+      <div className="bg-amber-600 text-white text-[11px] sm:text-xs py-2 px-4 font-bold text-center flex flex-wrap items-center justify-center gap-2 border-b border-amber-500 shadow-xs" id="landing-promo-banner">
+        <span className="bg-amber-700/60 px-2 py-0.5 rounded-md text-[10px] uppercase font-black">PROMOÇÃO DE HOJE</span>
+        <span>Aproveite o período de 1 Dia de Teste Grátis! Oferta expira em:</span>
+        <span className="font-mono bg-amber-950/40 px-2.5 py-0.5 rounded-md text-amber-100 font-extrabold tracking-wider">{timeLeft}</span>
+        <button 
+          onClick={onStartTrial}
+          className="underline hover:text-amber-100 cursor-pointer text-[11px] font-extrabold transition-colors ml-1"
+        >
+          Cadastrar Grátis Agora
+        </button>
+      </div>
+
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100" id="landing-header">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">

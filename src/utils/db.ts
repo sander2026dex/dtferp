@@ -5,6 +5,16 @@
 
 import { Custo, Venda, Produto, Cliente, Fornecedor } from '../types';
 
+export interface Vendedor {
+  id: string;
+  nome: string;
+  email: string;
+  telefone: string;
+  comissao: number; // percentage (e.g. 10 for 10%)
+  registro: string; // registration identifier
+  createdAt: number;
+}
+
 export interface UserAccount {
   email: string;
   nome: string;
@@ -13,6 +23,9 @@ export interface UserAccount {
   createdAt: number; // Timestamp
   serialKey?: string;
   status: 'active' | 'trial' | 'blocked' | 'expired';
+  empresaNome?: string;
+  empresaCnpj?: string;
+  empresaLogo?: string; // URL or Google Drive link
 }
 
 export interface SerialKey {
@@ -30,6 +43,7 @@ export interface UserData {
   produtos: Produto[];
   clientes: Cliente[];
   fornecedores: Fornecedor[];
+  vendedores?: Vendedor[];
 }
 
 // Ensure unique browser physical device ID
@@ -131,7 +145,15 @@ export function loadUserDatabase(email: string): UserData {
   const key = getUserStorageKey(email);
   const data = localStorage.getItem(key);
   if (data) {
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    return {
+      custos: parsed.custos || [],
+      vendas: parsed.vendas || [],
+      produtos: parsed.produtos || [],
+      clientes: parsed.clientes || [],
+      fornecedores: parsed.fornecedores || [],
+      vendedores: parsed.vendedores || []
+    };
   }
   
   // Return empty structure if new user, which will get seeded with defaults if desired
@@ -140,7 +162,8 @@ export function loadUserDatabase(email: string): UserData {
     vendas: [],
     produtos: [],
     clientes: [],
-    fornecedores: []
+    fornecedores: [],
+    vendedores: []
   };
 }
 
@@ -149,8 +172,29 @@ export function saveUserDatabase(email: string, data: UserData) {
   localStorage.setItem(key, JSON.stringify(data));
 }
 
+// Global user update helper
+export function updateGlobalUser(email: string, updates: Partial<UserAccount>): UserAccount | null {
+  const users = getGlobalUsers();
+  const index = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+  if (index === -1) return null;
+  
+  const updatedUser = { ...users[index], ...updates };
+  users[index] = updatedUser;
+  saveGlobalUsers(users);
+  return updatedUser;
+}
+
 // Registration function
-export function registerUser(nome: string, email: string, celular: string, password: string, serialKey?: string): { success: boolean; message: string; user?: UserAccount } {
+export function registerUser(
+  nome: string, 
+  email: string, 
+  celular: string, 
+  password: string, 
+  serialKey?: string,
+  empresaNome?: string,
+  empresaCnpj?: string,
+  empresaLogo?: string
+): { success: boolean; message: string; user?: UserAccount } {
   const users = getGlobalUsers();
   const lowerEmail = email.toLowerCase();
   
@@ -188,7 +232,10 @@ export function registerUser(nome: string, email: string, celular: string, passw
     passwordHash: password,
     createdAt: Date.now(),
     serialKey: serialKey || undefined,
-    status: status
+    status: status,
+    empresaNome: empresaNome || undefined,
+    empresaCnpj: empresaCnpj || undefined,
+    empresaLogo: empresaLogo || undefined
   };
   
   users.push(newUser);

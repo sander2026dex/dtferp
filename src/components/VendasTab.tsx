@@ -7,11 +7,13 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Trash2, Edit2, CheckCircle2, Clock, AlertTriangle, Calendar, User, ShoppingBag, DollarSign, Layers, X } from 'lucide-react';
 import { Venda, Produto, Cliente } from '../types';
+import { Vendedor } from '../utils/db';
 
 interface VendasTabProps {
   vendas: Venda[];
   produtos: Produto[];
   clientes: Cliente[];
+  vendedores?: Vendedor[];
   onAddVenda: (venda: Omit<Venda, 'id'>) => void;
   onEditVenda: (venda: Venda) => void;
   onDeleteVenda: (id: string) => void;
@@ -22,6 +24,7 @@ export default function VendasTab({
   vendas,
   produtos,
   clientes,
+  vendedores = [],
   onAddVenda,
   onEditVenda,
   onDeleteVenda,
@@ -40,6 +43,7 @@ export default function VendasTab({
     quantidade: '1',
     valorUnitario: '',
     status: 'Concluído' as 'Concluído' | 'Pendente',
+    vendedor: '',
   });
 
   // Calculate statistics
@@ -82,6 +86,7 @@ export default function VendasTab({
       quantidade: parseInt(formData.quantidade),
       valorUnitario: parseFloat(formData.valorUnitario),
       status: formData.status,
+      vendedor: formData.vendedor || undefined,
     };
 
     if (editingVenda) {
@@ -101,6 +106,7 @@ export default function VendasTab({
       quantidade: '1',
       valorUnitario: '',
       status: 'Concluído',
+      vendedor: '',
     });
     setEditingVenda(null);
     setIsFormOpen(false);
@@ -115,6 +121,7 @@ export default function VendasTab({
       quantidade: venda.quantidade.toString(),
       valorUnitario: venda.valorUnitario.toString(),
       status: venda.status,
+      vendedor: venda.vendedor || '',
     });
     setIsFormOpen(true);
   };
@@ -346,6 +353,25 @@ export default function VendasTab({
                   </div>
                 </div>
 
+                {/* Vendedor Select */}
+                {vendedores.length > 0 && (
+                  <div className="space-y-1.5" id="vendedor-select-container">
+                    <label className="text-xs font-semibold text-slate-600 flex items-center gap-1">
+                      <User className="w-3.5 h-3.5 text-slate-400" /> Vendedor Associado (Comissão)
+                    </label>
+                    <select
+                      value={formData.vendedor}
+                      onChange={(e) => setFormData({ ...formData, vendedor: e.target.value })}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-800 cursor-pointer"
+                    >
+                      <option value="">Nenhum (Sem vendedor associado)</option>
+                      {vendedores.map(v => (
+                        <option key={v.id} value={v.nome}>{v.nome} ({v.comissao}%)</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {/* Status Toggle */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-600 block">Status da Venda</label>
@@ -422,8 +448,15 @@ export default function VendasTab({
                       <td className="py-4 px-6 font-mono text-slate-500 text-xs">
                         {v.data.split('-').reverse().join('/')}
                       </td>
-                      <td className="py-4 px-6 font-semibold text-slate-800">
-                        {v.cliente}
+                      <td className="py-4 px-6">
+                        <span className="font-semibold text-slate-800 block">{v.cliente}</span>
+                        {v.vendedor ? (
+                          <span className="text-[10px] text-indigo-500 font-bold bg-indigo-50/50 px-1.5 py-0.5 rounded-md inline-block mt-0.5">
+                            Vendedor: {v.vendedor}
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-slate-400 font-normal italic mt-0.5 block">Sem vendedor</span>
+                        )}
                       </td>
                       <td className="py-4 px-6 text-slate-600">
                         {v.produto}

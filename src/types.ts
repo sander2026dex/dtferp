@@ -19,6 +19,7 @@ export interface Venda {
   quantidade: number;
   valorUnitario: number;
   status: 'Concluído' | 'Pendente';
+  vendedor?: string; // Optional salesperson name
 }
 
 export interface Produto {
@@ -46,4 +47,4 @@ export interface Fornecedor {
   produtosFornecidos: string;
 }
 
-export type TabType = 'dashboard' | 'custos' | 'vendas' | 'produtos' | 'clientes' | 'fornecedores' | 'orcamentos' | 'relatorios' | 'admin';
+export type TabType = 'dashboard' | 'custos' | 'vendas' | 'produtos' | 'clientes' | 'fornecedores' | 'orcamentos' | 'relatorios' | 'admin' | 'config';

@@ -23,6 +23,7 @@ import RelatoriosTab from './components/RelatoriosTab';
 import FornecedoresTab from './components/FornecedoresTab';
 import OrcamentosTab from './components/OrcamentosTab';
 import AdminTab from './components/AdminTab';
+import ConfigTab from './components/ConfigTab';
 
 // Auth & Landing Components
 import LandingPage from './components/LandingPage';
@@ -32,7 +33,9 @@ import {
   loadUserDatabase, 
   saveUserDatabase, 
   getGlobalUsers, 
-  saveGlobalUsers 
+  saveGlobalUsers,
+  Vendedor,
+  updateGlobalUser
 } from './utils/db';
 
 import { 
@@ -148,6 +151,7 @@ export default function App() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
 
   // Sync state with tenant DB
   useEffect(() => {
@@ -162,13 +166,15 @@ export default function App() {
         setProdutos(DEFAULT_PRODUTOS);
         setClientes(DEFAULT_CLIENTES);
         setFornecedores(DEFAULT_FORNECEDORES);
+        setVendedores([]);
         
         saveUserDatabase(currentUser.email, {
           custos: DEFAULT_CUSTOS,
           vendas: DEFAULT_VENDAS,
           produtos: DEFAULT_PRODUTOS,
           clientes: DEFAULT_CLIENTES,
-          fornecedores: DEFAULT_FORNECEDORES
+          fornecedores: DEFAULT_FORNECEDORES,
+          vendedores: []
         });
       } else {
         setCustos(db.custos);
@@ -176,6 +182,7 @@ export default function App() {
         setProdutos(db.produtos);
         setClientes(db.clientes);
         setFornecedores(db.fornecedores);
+        setVendedores(db.vendedores || []);
       }
     } else {
       localStorage.removeItem('dtf_current_user');
@@ -190,10 +197,36 @@ export default function App() {
         vendas,
         produtos,
         clientes,
-        fornecedores
+        fornecedores,
+        vendedores
       });
     }
-  }, [custos, vendas, produtos, clientes, fornecedores, currentUser]);
+  }, [custos, vendas, produtos, clientes, fornecedores, vendedores, currentUser]);
+
+  // Salespeople CRUD handlers
+  const handleAddVendedor = (newV: Omit<Vendedor, 'id' | 'createdAt'>) => {
+    const payload: Vendedor = {
+      ...newV,
+      id: `vnd_${Math.random().toString(36).substring(2, 9)}`,
+      createdAt: Date.now()
+    };
+    setVendedores(prev => [...prev, payload]);
+  };
+
+  const handleEditVendedor = (updatedV: Vendedor) => {
+    setVendedores(prev => prev.map(v => v.id === updatedV.id ? updatedV : v));
+  };
+
+  const handleDeleteVendedor = (id: string) => {
+    setVendedores(prev => prev.filter(v => v.id !== id));
+  };
+
+  // Profile updater
+  const handleUpdateCurrentUser = (updatedUser: UserAccount) => {
+    setCurrentUser(updatedUser);
+    localStorage.setItem('dtf_current_user', JSON.stringify(updatedUser));
+    updateGlobalUser(updatedUser.email, updatedUser);
+  };
 
   // Real-time trial countdown timer state and effect
   const [trialTimeLeft, setTrialTimeLeft] = useState('');
@@ -539,6 +572,7 @@ export default function App() {
     { id: 'fornecedores', label: '🏭 Fornecedores', icon: Truck, color: 'text-amber-600' },
     { id: 'orcamentos', label: '📄 Orçamentos', icon: FileText, color: 'text-teal-600' },
     { id: 'relatorios', label: '📋 Relatórios', icon: Database, color: 'text-pink-600' },
+    { id: 'config', label: '⚙️ Minha Empresa', icon: Settings, color: 'text-indigo-600' },
   ];
 
   if (isAdminUser) {
@@ -663,6 +697,7 @@ export default function App() {
             vendas={vendas} 
             produtos={produtos} 
             clientes={clientes} 
+            vendedores={vendedores}
             onAddVenda={handleAddVenda} 
             onEditVenda={handleEditVenda} 
             onDeleteVenda={handleDeleteVenda} 
@@ -698,6 +733,7 @@ export default function App() {
           <OrcamentosTab 
             clientes={clientes} 
             produtos={produtos} 
+            currentUser={currentUser}
           />
         )}
         {activeTab === 'relatorios' && (
@@ -709,6 +745,17 @@ export default function App() {
             fornecedores={fornecedores}
             onResetToDefaults={handleResetToDefaults}
             onImportBackup={handleImportBackup}
+          />
+        )}
+        {activeTab === 'config' && (
+          <ConfigTab 
+            currentUser={currentUser}
+            onUpdateCurrentUser={handleUpdateCurrentUser}
+            vendedores={vendedores}
+            onAddVendedor={handleAddVendedor}
+            onEditVendedor={handleEditVendedor}
+            onDeleteVendedor={handleDeleteVendedor}
+            vendas={vendas}
           />
         )}
         {activeTab === 'admin' && isAdminUser && (

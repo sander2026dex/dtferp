@@ -35,6 +35,10 @@ export default function AuthScreen({ onAuthSuccess, onGoBack, initialMode = 'log
   const [nome, setNome] = useState('');
   const [celular, setCelular] = useState('');
   const [serialKey, setSerialKey] = useState('');
+  const [empresaNome, setEmpresaNome] = useState('');
+  const [empresaCnpj, setEmpresaCnpj] = useState('');
+  const [empresaLogo, setEmpresaLogo] = useState('');
+  const [showCompanyFields, setShowCompanyFields] = useState(false);
   
   // States
   const [error, setError] = useState('');
@@ -71,7 +75,16 @@ export default function AuthScreen({ onAuthSuccess, onGoBack, initialMode = 'log
           setIsLoading(false);
           return;
         }
-        const result = registerUser(nome, email, celular, password, serialKey || undefined);
+        const result = registerUser(
+          nome, 
+          email, 
+          celular, 
+          password, 
+          serialKey || undefined,
+          showCompanyFields ? empresaNome : undefined,
+          showCompanyFields ? empresaCnpj : undefined,
+          showCompanyFields ? empresaLogo : undefined
+        );
         setIsLoading(false);
         if (result.success && result.user) {
           setSuccess(serialKey ? 'Cadastro e ativação efetuados com sucesso!' : 'Cadastro efetuado! 1 Dia de Teste Grátis Iniciado.');
@@ -192,6 +205,69 @@ export default function AuthScreen({ onAuthSuccess, onGoBack, initialMode = 'log
                     />
                   </div>
                 </div>
+
+                {/* Optional Company Details toggle */}
+                <div className="pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={showCompanyFields}
+                      onChange={(e) => setShowCompanyFields(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>Cadastrar dados da Empresa (CNPJ, Logo, Nome)</span>
+                  </label>
+                  <p className="text-[10px] text-slate-400 ml-5.5 mt-0.5">
+                    Seus orçamentos e relatórios serão impressos com os dados e logotipo da sua empresa.
+                  </p>
+                </div>
+
+                {showCompanyFields && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="space-y-3.5 pl-4 border-l-2 border-indigo-100 mt-2"
+                  >
+                    {/* Company Name */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-600">Nome Fantasia da Empresa</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Estamparia Digital Express"
+                        value={empresaNome}
+                        onChange={(e) => setEmpresaNome(e.target.value)}
+                        className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                      />
+                    </div>
+
+                    {/* Company CNPJ */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-600">CNPJ da Empresa</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: 00.000.000/0001-00"
+                        value={empresaCnpj}
+                        onChange={(e) => setEmpresaCnpj(e.target.value)}
+                        className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                      />
+                    </div>
+
+                    {/* Company Logo Link */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-600">Link do Logotipo (URL do Drive ou Imagem)</label>
+                      <input
+                        type="url"
+                        placeholder="Ex: https://drive.google.com/..."
+                        value={empresaLogo}
+                        onChange={(e) => setEmpresaLogo(e.target.value)}
+                        className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 font-mono text-[10px]"
+                      />
+                      <span className="text-[9px] text-slate-400 block leading-tight">
+                        Cole o link de compartilhamento público de uma imagem ou link direto. O sistema converterá links do Google Drive automaticamente.
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
               </>
             )}
 
