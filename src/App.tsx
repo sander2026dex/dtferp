@@ -64,6 +64,19 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const [currentVendedor, setCurrentVendedor] = useState<Vendedor | null>(() => {
+    const saved = localStorage.getItem('dtf_current_vendedor');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  useEffect(() => {
+    if (currentVendedor) {
+      localStorage.setItem('dtf_current_vendedor', JSON.stringify(currentVendedor));
+    } else {
+      localStorage.removeItem('dtf_current_vendedor');
+    }
+  }, [currentVendedor]);
+
   const [currentView, setCurrentView] = useState<'landing' | 'login' | 'register'>('landing');
 
   // Path routing state (to handle `/admin` and navigation)
@@ -203,6 +216,44 @@ export default function App() {
     }
   }, [custos, vendas, produtos, clientes, fornecedores, vendedores, currentUser]);
 
+  // Synchronize database across tabs if localStorage changes (e.g. salesperson deleted by admin in another tab)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (currentUser && e.key === `dtf_user_db_${currentUser.email.toLowerCase()}`) {
+        const db = loadUserDatabase(currentUser.email);
+        setCustos(db.custos);
+        setVendas(db.vendas);
+        setProdutos(db.produtos);
+        setClientes(db.clientes);
+        setFornecedores(db.fornecedores);
+        setVendedores(db.vendedores || []);
+      }
+      if (e.key === 'dtf_current_vendedor' && !e.newValue) {
+        setCurrentVendedor(null);
+        setCurrentView('landing');
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [currentUser]);
+
+  // If a salesperson is logged in, continuously check if they still exist in the database.
+  // If they were deleted, log them out immediately!
+  useEffect(() => {
+    if (currentVendedor && currentUser) {
+      const stillExists = vendedores.some(v => v.id === currentVendedor.id);
+      // Wait: only check ifendedores state has been initialized and populated
+      // If we have sellers in localStorage but state is empty, wait for sync.
+      const db = loadUserDatabase(currentUser.email);
+      const dbSellersList = db.vendedores || [];
+      const stillInDb = dbSellersList.some(v => v.id === currentVendedor.id);
+      
+      if (!stillInDb) {
+        handleLogout();
+      }
+    }
+  }, [vendedores, currentVendedor, currentUser]);
+
   // Salespeople CRUD handlers
   const handleAddVendedor = (newV: Omit<Vendedor, 'id' | 'createdAt'>) => {
     const payload: Vendedor = {
@@ -218,7 +269,16 @@ export default function App() {
   };
 
   const handleDeleteVendedor = (id: string) => {
-    setVendedores(prev => prev.filter(v => v.id !== id));
+    setVendedores(prev => {
+      const updated = prev.filter(v => v.id !== id);
+      if (currentVendedor && currentVendedor.id === id) {
+        // Log them out!
+        setTimeout(() => {
+          handleLogout();
+        }, 50);
+      }
+      return updated;
+    });
   };
 
   // Profile updater
@@ -284,6 +344,7 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setCurrentVendedor(null);
     setCurrentView('landing');
     setActiveTab('dashboard');
     setIsAdminSessionActive(false);
@@ -515,8 +576,15 @@ export default function App() {
     
     return (
       <AuthScreen 
-        onAuthSuccess={(user) => {
+        onAuthSuccess={(user, vendedor) => {
           setCurrentUser(user);
+          if (vendedor) {
+            setCurrentVendedor(vendedor);
+            setActiveTab('orcamentos');
+          } else {
+            setCurrentVendedor(null);
+            setActiveTab('dashboard');
+          }
         }}
         onGoBack={() => setCurrentView('landing')}
         initialMode={currentView === 'register' ? 'register' : 'login'}
@@ -563,19 +631,24 @@ export default function App() {
   }
 
   // 3. Normal ERP Workbook View
-  const workbookTabs = [
-    { id: 'dashboard', label: '📊 Dashboard', icon: TrendingUp, color: 'text-indigo-600' },
-    { id: 'custos', label: '💸 Custos', icon: Wallet, color: 'text-rose-600' },
-    { id: 'vendas', label: '💰 Vendas', icon: TrendingUp, color: 'text-emerald-600' },
-    { id: 'produtos', label: '📦 Produtos', icon: Archive, color: 'text-blue-600' },
-    { id: 'clientes', label: '👥 Clientes', icon: Users, color: 'text-purple-600' },
-    { id: 'fornecedores', label: '🏭 Fornecedores', icon: Truck, color: 'text-amber-600' },
-    { id: 'orcamentos', label: '📄 Orçamentos', icon: FileText, color: 'text-teal-600' },
-    { id: 'relatorios', label: '📋 Relatórios', icon: Database, color: 'text-pink-600' },
-    { id: 'config', label: '⚙️ Minha Empresa', icon: Settings, color: 'text-indigo-600' },
-  ];
+  const workbookTabs = currentVendedor
+    ? [
+        { id: 'orcamentos', label: '📄 Orçamentos', icon: FileText, color: 'text-teal-600' },
+        { id: 'vendas', label: '💰 Minhas Vendas', icon: TrendingUp, color: 'text-emerald-600' },
+      ]
+    : [
+        { id: 'dashboard', label: '📊 Dashboard', icon: TrendingUp, color: 'text-indigo-600' },
+        { id: 'custos', label: '💸 Custos', icon: Wallet, color: 'text-rose-600' },
+        { id: 'vendas', label: '💰 Vendas', icon: TrendingUp, color: 'text-emerald-600' },
+        { id: 'produtos', label: '📦 Produtos', icon: Archive, color: 'text-blue-600' },
+        { id: 'clientes', label: '👥 Clientes', icon: Users, color: 'text-purple-600' },
+        { id: 'fornecedores', label: '🏭 Fornecedores', icon: Truck, color: 'text-amber-600' },
+        { id: 'orcamentos', label: '📄 Orçamentos', icon: FileText, color: 'text-teal-600' },
+        { id: 'relatorios', label: '📋 Relatórios', icon: Database, color: 'text-pink-600' },
+        { id: 'config', label: '⚙️ Minha Empresa', icon: Settings, color: 'text-indigo-600' },
+      ];
 
-  if (isAdminUser) {
+  if (isAdminUser && !currentVendedor) {
     workbookTabs.push({ id: 'admin', label: '⚙️ Painel Admin', icon: Settings, color: 'text-slate-800' });
   }
 
@@ -625,8 +698,17 @@ export default function App() {
           {/* Connected indicators & Logout */}
           <div className="flex items-center gap-4">
             <div className="hidden sm:flex flex-col text-right">
-              <span className="text-xs font-bold text-slate-800">{currentUser.nome}</span>
-              <span className="text-[10px] font-mono text-slate-400">{currentUser.email}</span>
+              {currentVendedor ? (
+                <>
+                  <span className="text-xs font-bold text-indigo-600">💼 {currentVendedor.nome}</span>
+                  <span className="text-[9px] font-semibold text-slate-400">Vendedor ({currentVendedor.registro})</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs font-bold text-slate-800">{currentUser.nome}</span>
+                  <span className="text-[10px] font-mono text-slate-400">{currentUser.email}</span>
+                </>
+              )}
             </div>
             
             <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-full border border-emerald-100" id="sync-badge">
@@ -734,6 +816,7 @@ export default function App() {
             clientes={clientes} 
             produtos={produtos} 
             currentUser={currentUser}
+            currentVendedor={currentVendedor}
           />
         )}
         {activeTab === 'relatorios' && (

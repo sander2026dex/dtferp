@@ -13,6 +13,10 @@ export interface Vendedor {
   comissao: number; // percentage (e.g. 10 for 10%)
   registro: string; // registration identifier
   createdAt: number;
+  senha?: string; // password for salesperson login
+  status: 'Pendente' | 'Ativo' | 'Bloqueado'; // approval status
+  autorizadoPor?: string; // name of user who approved
+  tenantEmail?: string; // main account email it is linked to
 }
 
 export interface UserAccount {
@@ -26,6 +30,7 @@ export interface UserAccount {
   empresaNome?: string;
   empresaCnpj?: string;
   empresaLogo?: string; // URL or Google Drive link
+  chavePix?: string; // Random Pix Key
 }
 
 export interface SerialKey {
@@ -284,4 +289,49 @@ export function loginUser(email: string, password: string): {
   }
   
   return { success: true, message: 'Login efetuado com sucesso!', user: foundUser };
+}
+
+// Salesperson Login across all tenant databases
+export function loginVendedor(emailOrCode: string, password: string): { 
+  success: boolean; 
+  message: string; 
+  vendedor?: Vendedor; 
+  tenant?: UserAccount;
+} {
+  const users = getGlobalUsers();
+  const searchInput = emailOrCode.trim().toLowerCase();
+
+  for (const tenant of users) {
+    const db = loadUserDatabase(tenant.email);
+    if (db.vendedores && db.vendedores.length > 0) {
+      const found = db.vendedores.find(v => 
+        v.email.trim().toLowerCase() === searchInput || 
+        v.registro.trim().toLowerCase() === searchInput
+      );
+      
+      if (found) {
+        // We found a seller with this identifier
+        if (found.senha && found.senha !== password) {
+          return { success: false, message: 'Senha incorreta para este vendedor.' };
+        }
+        if (!found.senha && password !== '123456') { // Default password if none set
+          return { success: false, message: 'Senha padrão incorreta (tente 123456) ou peça para redefinir.' };
+        }
+        if (found.status === 'Pendente') {
+          return { success: false, message: 'Acesso Pendente: Seu cadastro está aguardando liberação do gestor.' };
+        }
+        if (found.status === 'Bloqueado') {
+          return { success: false, message: 'Acesso Bloqueado: Seu acesso foi suspenso pelo gestor da empresa.' };
+        }
+        return {
+          success: true,
+          message: 'Acesso autorizado como Vendedor!',
+          vendedor: found,
+          tenant: tenant
+        };
+      }
+    }
+  }
+  
+  return { success: false, message: 'Vendedor não encontrado com este e-mail ou código.' };
 }

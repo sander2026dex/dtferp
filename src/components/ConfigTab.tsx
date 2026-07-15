@@ -61,6 +61,7 @@ export default function ConfigTab({
   const [empresaNome, setEmpresaNome] = useState(currentUser.empresaNome || '');
   const [empresaCnpj, setEmpresaCnpj] = useState(currentUser.empresaCnpj || '');
   const [empresaLogo, setEmpresaLogo] = useState(currentUser.empresaLogo || '');
+  const [chavePix, setChavePix] = useState(currentUser.chavePix || '');
   const [companySuccess, setCompanySuccess] = useState('');
   const [companyError, setCompanyError] = useState('');
 
@@ -72,7 +73,9 @@ export default function ConfigTab({
     email: '',
     telefone: '',
     comissao: '5', // Default 5%
-    registro: ''
+    registro: '',
+    senha: '',
+    status: 'Ativo' as 'Pendente' | 'Ativo' | 'Bloqueado'
   });
   const [vendedorError, setVendedorError] = useState('');
   const [vendedorSuccess, setVendedorSuccess] = useState('');
@@ -88,7 +91,8 @@ export default function ConfigTab({
         ...currentUser,
         empresaNome: empresaNome.trim() || undefined,
         empresaCnpj: empresaCnpj.trim() || undefined,
-        empresaLogo: empresaLogo.trim() || undefined
+        empresaLogo: empresaLogo.trim() || undefined,
+        chavePix: chavePix.trim() || undefined
       };
       
       onUpdateCurrentUser(updated);
@@ -121,7 +125,11 @@ export default function ConfigTab({
       email: vendedorForm.email.trim(),
       telefone: vendedorForm.telefone.trim(),
       comissao: commissionNum,
-      registro: vendedorForm.registro.trim()
+      registro: vendedorForm.registro.trim(),
+      senha: vendedorForm.senha.trim() || '123456', // Default simple password if empty
+      status: vendedorForm.status,
+      autorizadoPor: currentUser.nome, // Record the name of the user who authorized
+      tenantEmail: currentUser.email
     };
 
     if (editingVendedor) {
@@ -141,7 +149,9 @@ export default function ConfigTab({
       email: '',
       telefone: '',
       comissao: '5',
-      registro: ''
+      registro: '',
+      senha: '',
+      status: 'Ativo'
     });
     setEditingVendedor(null);
     setIsVendedorFormOpen(false);
@@ -156,7 +166,9 @@ export default function ConfigTab({
       email: v.email,
       telefone: v.telefone,
       comissao: v.comissao.toString(),
-      registro: v.registro
+      registro: v.registro,
+      senha: v.senha || '',
+      status: v.status || 'Ativo'
     });
     setIsVendedorFormOpen(true);
   };
@@ -283,6 +295,23 @@ export default function ConfigTab({
               </div>
               <p className="text-[10px] text-slate-400 leading-normal">
                 Faça o upload do logo no Google Drive, clique em <strong>Compartilhar (Qualquer pessoa com o link pode ler)</strong> e cole o link aqui. Nosso sistema converte o link para exibição direta.
+              </p>
+            </div>
+
+            {/* Chave Pix */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                Chave PIX (Chave Aleatória para cobrança automática)
+              </label>
+              <input
+                type="text"
+                value={chavePix}
+                onChange={(e) => setChavePix(e.target.value)}
+                placeholder="Cole sua chave PIX aleatória (Ex: f89a7410-ecb8-47bc-87c2...)"
+                className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800 font-mono text-[11px]"
+              />
+              <p className="text-[10px] text-slate-400 leading-normal">
+                Essa chave será utilizada nos orçamentos gerados e nas cobranças automáticas por WhatsApp e E-mail.
               </p>
             </div>
 
@@ -446,7 +475,7 @@ export default function ConfigTab({
                   </div>
 
                   {/* Email */}
-                  <div className="space-y-1 sm:col-span-2">
+                  <div className="space-y-1">
                     <label className="block text-[11px] font-bold text-slate-700">Endereço de E-mail</label>
                     <input
                       type="email"
@@ -455,6 +484,33 @@ export default function ConfigTab({
                       placeholder="Ex: carlos@estamparia.com"
                       className="block w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
                     />
+                  </div>
+
+                  {/* Senha de Acesso */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-700">Senha de Acesso *</label>
+                    <input
+                      type="text"
+                      required
+                      value={vendedorForm.senha}
+                      onChange={(e) => setVendedorForm({...vendedorForm, senha: e.target.value})}
+                      placeholder="Senha do vendedor (Ex: 123456)"
+                      className="block w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                    />
+                  </div>
+
+                  {/* Status */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-700">Status da Conta *</label>
+                    <select
+                      value={vendedorForm.status}
+                      onChange={(e) => setVendedorForm({...vendedorForm, status: e.target.value as any})}
+                      className="block w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                    >
+                      <option value="Ativo">Ativo (Permitir Acesso)</option>
+                      <option value="Pendente">Pendente (Aguardando Liberação)</option>
+                      <option value="Bloqueado">Bloqueado (Negar Acesso)</option>
+                    </select>
                   </div>
 
                   <div className="sm:col-span-2 pt-2 flex gap-3 justify-end">
@@ -493,15 +549,15 @@ export default function ConfigTab({
                 </p>
               </div>
             ) : (
-              <table className="w-full text-left border-collapse min-w-[600px]">
+              <table className="w-full text-left border-collapse min-w-[650px]">
                 <thead>
                   <tr className="border-b border-slate-100 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
                     <th className="pb-3 pl-2">Registro</th>
                     <th className="pb-3">Vendedor</th>
-                    <th className="pb-3">Contato</th>
+                    <th className="pb-3">Credenciais</th>
+                    <th className="pb-3">Autorização</th>
                     <th className="pb-3 text-center">Comissão</th>
-                    <th className="pb-3 text-right">Vendas Concluídas</th>
-                    <th className="pb-3 text-right">Comissões Devidas</th>
+                    <th className="pb-3 text-right">Vendas / Comissões</th>
                     <th className="pb-3 pr-2 text-right">Ações</th>
                   </tr>
                 </thead>
@@ -509,22 +565,50 @@ export default function ConfigTab({
                   {vendedores.map(v => {
                     const stats = getSalespersonStats(v.nome);
                     const comissaoDevida = (stats.totalVendido * v.comissao) / 100;
+                    
+                    // Status styling badge
+                    let statusBadge = (
+                      <span className="px-2 py-0.5 text-[9px] font-extrabold rounded-full bg-emerald-50 text-emerald-700 uppercase">Ativo</span>
+                    );
+                    if (v.status === 'Pendente') {
+                      statusBadge = (
+                        <span className="px-2 py-0.5 text-[9px] font-extrabold rounded-full bg-amber-50 text-amber-700 uppercase">Pendente</span>
+                      );
+                    } else if (v.status === 'Bloqueado') {
+                      statusBadge = (
+                        <span className="px-2 py-0.5 text-[9px] font-extrabold rounded-full bg-rose-50 text-rose-700 uppercase">Bloqueado</span>
+                      );
+                    }
+
                     return (
                       <tr key={v.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3 pl-2 font-mono font-bold text-indigo-600">{v.registro}</td>
-                        <td className="py-3 font-semibold text-slate-800">{v.nome}</td>
+                        <td className="py-3 pl-2">
+                          <div className="font-mono font-bold text-indigo-600">{v.registro}</div>
+                          <div className="mt-1">{statusBadge}</div>
+                        </td>
+                        <td className="py-3">
+                          <div className="font-semibold text-slate-800">{v.nome}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 font-mono">ID: {v.id}</div>
+                        </td>
                         <td className="py-3 text-slate-500">
-                          <div className="flex flex-col gap-0.5">
-                            {v.telefone && <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-slate-400" /> {v.telefone}</span>}
-                            {v.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3 text-slate-400" /> {v.email}</span>}
+                          <div className="flex flex-col gap-0.5 font-mono text-[10px]">
+                            {v.email && <span className="text-slate-600">{v.email}</span>}
+                            <span className="text-indigo-600 font-bold">Senha: {v.senha || '123456'}</span>
                           </div>
                         </td>
-                        <td className="py-3 text-center font-bold font-mono text-indigo-600 bg-indigo-50/20 px-2 rounded-lg">{v.comissao}%</td>
-                        <td className="py-3 text-right font-mono font-medium text-slate-700">
-                          <div>{stats.quantidade} ped.</div>
-                          <div className="text-[10px] text-slate-400">{formatCurrency(stats.totalVendido)}</div>
+                        <td className="py-3 text-slate-500">
+                          <div className="text-[10px]">
+                            <p className="font-bold text-slate-600">Autorizado por:</p>
+                            <p className="text-indigo-600 font-medium">{v.autorizadoPor || 'Gerente Master'}</p>
+                          </div>
                         </td>
-                        <td className="py-3 text-right font-bold font-mono text-emerald-600">{formatCurrency(comissaoDevida)}</td>
+                        <td className="py-3 text-center">
+                          <span className="inline-block font-bold font-mono text-indigo-600 bg-indigo-50/40 px-2.5 py-1 rounded-lg">{v.comissao}%</span>
+                        </td>
+                        <td className="py-3 text-right">
+                          <div className="font-mono font-medium text-slate-700">{stats.quantidade} ped. ({formatCurrency(stats.totalVendido)})</div>
+                          <div className="text-[10px] font-bold text-emerald-600 font-mono mt-0.5">Comissão: {formatCurrency(comissaoDevida)}</div>
+                        </td>
                         <td className="py-3 pr-2 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button

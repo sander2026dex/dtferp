@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { registerUser, loginUser, UserAccount } from '../utils/db';
+import { registerUser, loginUser, loginVendedor, UserAccount, Vendedor } from '../utils/db';
 import { 
   Lock, 
   Mail, 
@@ -17,17 +17,19 @@ import {
   AlertCircle,
   CheckCircle2,
   Smartphone,
-  MessageSquare
+  MessageSquare,
+  Users
 } from 'lucide-react';
 
 interface AuthScreenProps {
-  onAuthSuccess: (user: UserAccount) => void;
+  onAuthSuccess: (user: UserAccount, vendedor?: Vendedor | null) => void;
   onGoBack: () => void;
   initialMode?: 'login' | 'register';
 }
 
 export default function AuthScreen({ onAuthSuccess, onGoBack, initialMode = 'login' }: AuthScreenProps) {
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
+  const [isVendedorLogin, setIsVendedorLogin] = useState(false);
   
   // Inputs
   const [email, setEmail] = useState('');
@@ -54,18 +56,32 @@ export default function AuthScreen({ onAuthSuccess, onGoBack, initialMode = 'log
 
     setTimeout(() => {
       if (isLogin) {
-        // Login Flow
-        const result = loginUser(email, password);
-        setIsLoading(false);
-        if (result.success && result.user) {
-          setSuccess('Login realizado com sucesso! Carregando dados...');
-          setTimeout(() => {
-            onAuthSuccess(result.user!);
-          }, 800);
+        if (isVendedorLogin) {
+          // Salesperson Login Flow
+          const result = loginVendedor(email, password);
+          setIsLoading(false);
+          if (result.success && result.vendedor && result.tenant) {
+            setSuccess(`Bem-vindo, vendedor ${result.vendedor.nome}! Carregando dados da empresa...`);
+            setTimeout(() => {
+              onAuthSuccess(result.tenant!, result.vendedor);
+            }, 1000);
+          } else {
+            setError(result.message);
+          }
         } else {
-          setError(result.message);
-          if (result.deviceBlocked) {
-            setDeviceBlocked(true);
+          // Login Flow
+          const result = loginUser(email, password);
+          setIsLoading(false);
+          if (result.success && result.user) {
+            setSuccess('Login realizado com sucesso! Carregando dados...');
+            setTimeout(() => {
+              onAuthSuccess(result.user!, null);
+            }, 800);
+          } else {
+            setError(result.message);
+            if (result.deviceBlocked) {
+              setDeviceBlocked(true);
+            }
           }
         }
       } else {
@@ -271,27 +287,58 @@ export default function AuthScreen({ onAuthSuccess, onGoBack, initialMode = 'log
               </>
             )}
 
-            {/* Email Address */}
+            {isLogin && (
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl" id="login-role-selector">
+                <button
+                  type="button"
+                  onClick={() => setIsVendedorLogin(false)}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    !isVendedorLogin 
+                      ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/40' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  🏢 Acesso Gestor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsVendedorLogin(true)}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    isVendedorLogin 
+                      ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/40' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  💼 Acesso Vendedor
+                </button>
+              </div>
+            )}
+
+            {/* Email Address or Seller Registration */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">Endereço de E-mail</label>
+              <label className="block text-xs font-bold text-slate-700">
+                {isVendedorLogin ? 'Código de Matrícula ou E-mail do Vendedor' : 'Endereço de E-mail'}
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Mail className="w-4.5 h-4.5" />
+                  {isVendedorLogin ? <Users className="w-4.5 h-4.5" /> : <Mail className="w-4.5 h-4.5" />}
                 </div>
                 <input
-                  type="email"
+                  type={isVendedorLogin ? "text" : "email"}
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Ex: joao@email.com"
-                  className="block w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800"
+                  placeholder={isVendedorLogin ? "Ex: VND-1234 ou carlos@email.com" : "Ex: joao@email.com"}
+                  className="block w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800 font-medium"
                 />
               </div>
             </div>
 
             {/* Password */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">Senha de Acesso</label>
+              <label className="block text-xs font-bold text-slate-700">
+                {isVendedorLogin ? 'Senha do Vendedor' : 'Senha de Acesso'}
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <Lock className="w-4.5 h-4.5" />
@@ -352,6 +399,7 @@ export default function AuthScreen({ onAuthSuccess, onGoBack, initialMode = 'log
                 setSuccess('');
                 setDeviceBlocked(false);
                 setIsLogin(!isLogin);
+                setIsVendedorLogin(false);
               }}
               className="text-xs font-bold text-indigo-600 hover:text-indigo-500 transition-colors cursor-pointer"
               id="auth-toggle-mode-btn"

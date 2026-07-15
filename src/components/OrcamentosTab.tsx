@@ -22,12 +22,13 @@ import {
   DollarSign
 } from 'lucide-react';
 import { Cliente, Produto } from '../types';
-import { UserAccount } from '../utils/db';
+import { UserAccount, Vendedor } from '../utils/db';
 
 interface OrcamentosTabProps {
   clientes: Cliente[];
   produtos: Produto[];
   currentUser?: UserAccount | null;
+  currentVendedor?: Vendedor | null;
 }
 
 interface QuoteItem {
@@ -37,7 +38,19 @@ interface QuoteItem {
   valorUnitario: number;
 }
 
-export default function OrcamentosTab({ clientes, produtos, currentUser }: OrcamentosTabProps) {
+export default function OrcamentosTab({ clientes, produtos, currentUser, currentVendedor }: OrcamentosTabProps) {
+  // Unique Quote Code/ID System
+  const [quoteCode, setQuoteCode] = useState<string>(() => {
+    return `ORC-${Math.floor(100000 + Math.random() * 900000)}`;
+  });
+
+  const handleNewQuote = () => {
+    setQuoteItems([]);
+    setSelectedClienteId('');
+    setCustomCliente({ nome: '', telefone: '', email: '' });
+    setQuoteCode(`ORC-${Math.floor(100000 + Math.random() * 900000)}`);
+  };
+
   const formatLogoUrl = (url?: string) => {
     if (!url) return '';
     const trimmed = url.trim();
@@ -166,10 +179,15 @@ export default function OrcamentosTab({ clientes, produtos, currentUser }: Orcam
   const generateWhatsAppContent = () => {
     const client = getActiveClient();
     const clientHeader = client ? `*Cliente:* ${client.nome}\n` : '';
+    const vendedorStr = currentVendedor 
+      ? `*Vendedor:* ${currentVendedor.nome} (Ref: ${currentVendedor.registro})\n`
+      : '';
     
-    let text = `*📄 ORÇAMENTO - DTF TÊXTIL*\n`;
+    let text = `*📄 ORÇAMENTO - ${currentUser?.empresaNome?.toUpperCase() || 'DTF TÊXTIL'}*\n`;
+    text += `*Código:* ${quoteCode}\n`;
     text += `=========================\n`;
     if (clientHeader) text += clientHeader;
+    if (vendedorStr) text += vendedorStr;
     text += `*Data:* ${new Date().toLocaleDateString('pt-BR')}\n\n`;
     
     text += `*🛍️ DETALHES DO PEDIDO:*\n`;
@@ -185,6 +203,11 @@ export default function OrcamentosTab({ clientes, produtos, currentUser }: Orcam
     if (includeOtherTax) text += `*${otherTaxName} (${otherTaxPercent}%):* ${formatCurrency(otherTaxValue)}\n`;
     
     text += `*💰 TOTAL DO ORÇAMENTO:* ${formatCurrency(grandTotal)}\n`;
+    
+    if (currentUser?.chavePix) {
+      text += `\n*🔑 PAGAMENTO VIA PIX (Chave Aleatória):*\n\`${currentUser.chavePix}\`\n`;
+    }
+    
     text += `=========================\n`;
     
     if (includeNotes && notes) {
@@ -197,11 +220,14 @@ export default function OrcamentosTab({ clientes, produtos, currentUser }: Orcam
   // Generate Email Content
   const generateEmailContent = () => {
     const client = getActiveClient();
-    const subject = `Orçamento DTF Têxtil - ${new Date().toLocaleDateString('pt-BR')}`;
+    const subject = `Orçamento [${quoteCode}] - ${currentUser?.empresaNome || 'DTF Têxtil'} - ${new Date().toLocaleDateString('pt-BR')}`;
     
     let body = `Olá, ${client ? client.nome : 'Cliente'}.\n\nSegue o orçamento detalhado solicitado:\n\n`;
-    
-    body += `🛍️ ITENS DO ORÇAMENTO:\n`;
+    body += `Código do Orçamento: ${quoteCode}\n`;
+    if (currentVendedor) {
+      body += `Vendedor Responsável: ${currentVendedor.nome} (${currentVendedor.registro})\n`;
+    }
+    body += `\n🛍️ ITENS DO ORÇAMENTO:\n`;
     quoteItems.forEach((item, index) => {
       body += `- ${item.nome}: ${item.quantidade}x de ${formatCurrency(item.valorUnitario)} = ${formatCurrency(item.quantidade * item.valorUnitario)}\n`;
     });
@@ -214,11 +240,15 @@ export default function OrcamentosTab({ clientes, produtos, currentUser }: Orcam
     
     body += `\nVALOR TOTAL: ${formatCurrency(grandTotal)}\n\n`;
     
+    if (currentUser?.chavePix) {
+      body += `🔑 CHAVE PIX PARA PAGAMENTO (Chave Aleatória):\n${currentUser.chavePix}\n\n`;
+    }
+    
     if (includeNotes && notes) {
       body += `📝 OBSERVAÇÕES:\n${notes}\n\n`;
     }
     
-    body += `Agradecemos a preferência!\nDTF Têxtil - Gestão de Alta Performance`;
+    body += `Agradecemos a preferência!\n${currentUser?.empresaNome || 'DTF Têxtil'} - Gestão de Alta Performance`;
     
     return `mailto:${client?.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
@@ -547,6 +577,18 @@ export default function OrcamentosTab({ clientes, produtos, currentUser }: Orcam
           <p className="text-xs text-slate-500 max-w-xl">
             Simule faturamentos rápidos, inclua tributações municipais ou estaduais e gere faturamento personalizado com envio direto para o cliente.
           </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="bg-slate-50 px-4 py-2 rounded-2xl border border-slate-250 flex flex-col items-end">
+            <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Código Ativo</span>
+            <span className="text-sm font-extrabold font-mono text-indigo-600">{quoteCode}</span>
+          </div>
+          <button
+            onClick={handleNewQuote}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+          >
+            Novo Orçamento
+          </button>
         </div>
       </div>
 
@@ -890,10 +932,13 @@ export default function OrcamentosTab({ clientes, produtos, currentUser }: Orcam
 
               <div className="text-right sm:text-right">
                 <span className="inline-block px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-extrabold rounded-full uppercase tracking-wider mb-2">
-                  Documento de Orçamento
+                  Orçamento: {quoteCode}
                 </span>
                 <p className="text-xs text-slate-500 font-medium">Data de Emissão: <strong className="text-slate-800 font-bold">{new Date().toLocaleDateString('pt-BR')}</strong></p>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">Válido até: <strong className="text-slate-800 font-bold">{new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR')}</strong></p>
+                {currentVendedor && (
+                  <p className="text-[10px] text-indigo-600 font-bold mt-1.5 uppercase">Vendedor: {currentVendedor.nome} ({currentVendedor.registro})</p>
+                )}
               </div>
             </div>
 

@@ -5,15 +5,17 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Trash2, Edit2, CheckCircle2, Clock, AlertTriangle, Calendar, User, ShoppingBag, DollarSign, Layers, X } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, CheckCircle2, Clock, AlertTriangle, Calendar, User, ShoppingBag, DollarSign, Layers, X, MessageSquare, Copy, ExternalLink, Mail } from 'lucide-react';
 import { Venda, Produto, Cliente } from '../types';
-import { Vendedor } from '../utils/db';
+import { Vendedor, UserAccount } from '../utils/db';
 
 interface VendasTabProps {
   vendas: Venda[];
   produtos: Produto[];
   clientes: Cliente[];
   vendedores?: Vendedor[];
+  currentUser?: UserAccount | null;
+  currentVendedor?: Vendedor | null;
   onAddVenda: (venda: Omit<Venda, 'id'>) => void;
   onEditVenda: (venda: Venda) => void;
   onDeleteVenda: (id: string) => void;
@@ -25,6 +27,8 @@ export default function VendasTab({
   produtos,
   clientes,
   vendedores = [],
+  currentUser,
+  currentVendedor,
   onAddVenda,
   onEditVenda,
   onDeleteVenda,
@@ -34,6 +38,10 @@ export default function VendasTab({
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Concluído' | 'Pendente'>('Todos');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingVenda, setEditingVenda] = useState<Venda | null>(null);
+  
+  // Billing (Cobrança) modal states
+  const [cobrarVenda, setCobrarVenda] = useState<Venda | null>(null);
+  const [successCopied, setSuccessCopied] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -46,19 +54,24 @@ export default function VendasTab({
     vendedor: '',
   });
 
+  // Filter sales to salesperson's own sales if they are logged in as vendedor
+  const vendedorSales = currentVendedor 
+    ? vendas.filter(v => v.vendedor?.trim().toLowerCase() === currentVendedor.nome.trim().toLowerCase())
+    : vendas;
+
   // Calculate statistics
-  const totalReceita = vendas
+  const totalReceita = vendedorSales
     .filter(v => v.status === 'Concluído')
     .reduce((acc, curr) => acc + (curr.quantidade * curr.valorUnitario), 0);
 
-  const totalPendente = vendas
+  const totalPendente = vendedorSales
     .filter(v => v.status === 'Pendente')
     .reduce((acc, curr) => acc + (curr.quantidade * curr.valorUnitario), 0);
 
-  const totalPedidos = vendas.length;
+  const totalPedidos = vendedorSales.length;
 
   // Filtered Vendas
-  const filteredVendas = vendas.filter(v => {
+  const filteredVendas = vendedorSales.filter(v => {
     const matchesSearch = v.cliente.toLowerCase().includes(search.toLowerCase()) || 
                           v.produto.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'Todos' || v.status === statusFilter;
@@ -86,7 +99,7 @@ export default function VendasTab({
       quantidade: parseInt(formData.quantidade),
       valorUnitario: parseFloat(formData.valorUnitario),
       status: formData.status,
-      vendedor: formData.vendedor || undefined,
+      vendedor: currentVendedor ? currentVendedor.nome : (formData.vendedor || undefined),
     };
 
     if (editingVenda) {
@@ -138,7 +151,7 @@ export default function VendasTab({
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Receita Concluída</span>
           <span className="text-2xl font-bold font-mono text-emerald-600 block">{formatCurrency(totalReceita)}</span>
           <span className="text-xs text-slate-500 block">
-            {vendas.filter(v => v.status === 'Concluído').length} de {totalPedidos} vendas
+            {vendedorSales.filter(v => v.status === 'Concluído').length} de {totalPedidos} vendas
           </span>
         </div>
 
@@ -146,7 +159,7 @@ export default function VendasTab({
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Faturamento Pendente</span>
           <span className="text-2xl font-bold font-mono text-amber-500 block">{formatCurrency(totalPendente)}</span>
           <span className="text-xs text-slate-500 block">
-            {vendas.filter(v => v.status === 'Pendente').length} pedidos em aberto
+            {vendedorSales.filter(v => v.status === 'Pendente').length} pedidos em aberto
           </span>
         </div>
 
@@ -165,6 +178,7 @@ export default function VendasTab({
                 quantidade: '1',
                 valorUnitario: produtos[0]?.precoVenda.toString() || '',
                 status: 'Concluído',
+                vendedor: currentVendedor ? currentVendedor.nome : '',
               });
               setIsFormOpen(true);
             }}
@@ -354,7 +368,7 @@ export default function VendasTab({
                 </div>
 
                 {/* Vendedor Select */}
-                {vendedores.length > 0 && (
+                {vendedores.length > 0 && !currentVendedor && (
                   <div className="space-y-1.5" id="vendedor-select-container">
                     <label className="text-xs font-semibold text-slate-600 flex items-center gap-1">
                       <User className="w-3.5 h-3.5 text-slate-400" /> Vendedor Associado (Comissão)
@@ -494,6 +508,13 @@ export default function VendasTab({
                       <td className="py-4 px-6">
                         <div className="flex items-center justify-center gap-2">
                           <button
+                            onClick={() => setCobrarVenda(v)}
+                            className="p-1.5 hover:bg-emerald-50 text-emerald-500 hover:text-emerald-700 rounded-lg transition-all cursor-pointer flex items-center justify-center"
+                            title="Gerar Cobrança (Pix, WhatsApp, Email)"
+                          >
+                            <DollarSign className="w-4 h-4 text-emerald-600 font-bold" />
+                          </button>
+                          <button
                             onClick={() => handleEditClick(v)}
                             className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-all cursor-pointer"
                             title="Editar"
@@ -527,6 +548,155 @@ export default function VendasTab({
           </table>
         </div>
       </div>
+
+      {/* Cobrança Modal */}
+      <AnimatePresence>
+        {cobrarVenda && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white rounded-3xl p-6 w-full max-w-lg border border-slate-100 shadow-2xl relative space-y-5"
+            >
+              <button 
+                onClick={() => {
+                  setCobrarVenda(null);
+                  setSuccessCopied(false);
+                }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all absolute top-6 right-6 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-widest block font-sans">Faturamento & Cobrança</span>
+                <h3 className="text-lg font-bold text-slate-900 font-display">
+                  Cobrança do Pedido #{cobrarVenda.id.replace('v_', 'PED-').toUpperCase()}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Envie a cobrança formatada por WhatsApp, e-mail ou copie os dados de pagamento.
+                </p>
+              </div>
+
+              {/* Order Info */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Cliente:</span>
+                  <span className="font-bold text-slate-800">{cobrarVenda.cliente}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Produto:</span>
+                  <span className="font-semibold text-slate-800">{cobrarVenda.produto}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Quantidade:</span>
+                  <span className="font-mono text-slate-800">{cobrarVenda.quantidade} un</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Valor Unitário:</span>
+                  <span className="font-mono text-slate-800">{formatCurrency(cobrarVenda.valorUnitario)}</span>
+                </div>
+                <div className="border-t border-slate-200/60 pt-2 flex justify-between text-sm font-bold">
+                  <span className="text-slate-600">Total do Pedido:</span>
+                  <span className="text-emerald-600 font-mono">{formatCurrency(cobrarVenda.quantidade * cobrarVenda.valorUnitario)}</span>
+                </div>
+              </div>
+
+              {/* Pix Display */}
+              <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100/60 text-xs space-y-2">
+                <span className="font-bold text-emerald-800 flex items-center gap-1.5">
+                  🔑 Chave Pix Cadastrada (Empresa)
+                </span>
+                {currentUser?.chavePix ? (
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <span className="font-mono font-bold text-slate-700 select-all break-all">{currentUser.chavePix}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentUser.chavePix || '');
+                        setSuccessCopied(true);
+                        setTimeout(() => setSuccessCopied(false), 2000);
+                      }}
+                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-all flex items-center gap-1 shrink-0 text-[10px] cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> {successCopied ? 'Copiado!' : 'Copiar'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 italic">
+                    Nenhuma chave Pix aleatória cadastrada pelo gestor. Para configurar, acesse a aba "Minha Empresa" e preencha a chave Pix.
+                  </p>
+                )}
+              </div>
+
+              {/* Message Preview */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Pré-visualização da Mensagem</label>
+                <textarea
+                  readOnly
+                  rows={6}
+                  value={(() => {
+                    const code = cobrarVenda.id.replace('v_', 'PED-').toUpperCase();
+                    const total = cobrarVenda.quantidade * cobrarVenda.valorUnitario;
+                    const pixText = currentUser?.chavePix 
+                      ? `🔑 Chave Pix (Aleatória):\n${currentUser.chavePix}`
+                      : `⚠️ Chave Pix não configurada pelo gestor. Entre em contato para combinarmos o pagamento.`;
+                    return `Olá, *${cobrarVenda.cliente}*!\n\nSegue a cobrança do seu pedido realizado na *${currentUser?.empresaNome || 'DTF TÊXTIL'}*:\n\n📦 *Pedido:* ${code}\n• *Produto:* ${cobrarVenda.produto}\n• *Quantidade:* ${cobrarVenda.quantidade}\n• *Valor Unitário:* ${formatCurrency(cobrarVenda.valorUnitario)}\n• *Total a pagar: ${formatCurrency(total)}*\n\n${pixText}\n\nCaso tenha alguma dúvida, estamos à disposição! Obrigado pela preferência.`;
+                  })()}
+                  className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] font-mono focus:outline-none text-slate-700 resize-none leading-relaxed"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* WhatsApp */}
+                <button
+                  onClick={() => {
+                    const clientData = clientes.find(c => c.nome.trim().toLowerCase() === cobrarVenda.cliente.trim().toLowerCase());
+                    const phoneStr = clientData?.telefone ? clientData.telefone.replace(/\D/g, '') : '';
+                    const code = cobrarVenda.id.replace('v_', 'PED-').toUpperCase();
+                    const total = cobrarVenda.quantidade * cobrarVenda.valorUnitario;
+                    const pixText = currentUser?.chavePix 
+                      ? `🔑 *Chave Pix (Aleatória):*\n${currentUser.chavePix}`
+                      : `⚠️ *Chave Pix não configurada pelo gestor.*`;
+                    const msg = `Olá, *${cobrarVenda.cliente}*!\n\nSegue a cobrança do seu pedido realizado na *${currentUser?.empresaNome || 'DTF TÊXTIL'}*:\n\n📦 *Pedido:* ${code}\n• *Produto:* ${cobrarVenda.produto}\n• *Quantidade:* ${cobrarVenda.quantidade}\n• *Valor Unitário:* ${formatCurrency(cobrarVenda.valorUnitario)}\n• *Total a pagar: ${formatCurrency(total)}*\n\n${pixText}\n\nCaso tenha alguma dúvida, estamos à disposição! Obrigado pela preferência.`;
+                    
+                    const whLink = `https://api.whatsapp.com/send?phone=${phoneStr ? (phoneStr.startsWith('55') ? phoneStr : '55' + phoneStr) : ''}&text=${encodeURIComponent(msg)}`;
+                    window.open(whLink, '_blank');
+                  }}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/15 cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4" /> Enviar por WhatsApp
+                </button>
+
+                {/* Email */}
+                <button
+                  onClick={() => {
+                    const clientData = clientes.find(c => c.nome.trim().toLowerCase() === cobrarVenda.cliente.trim().toLowerCase());
+                    const code = cobrarVenda.id.replace('v_', 'PED-').toUpperCase();
+                    const total = cobrarVenda.quantidade * cobrarVenda.valorUnitario;
+                    const pixText = currentUser?.chavePix 
+                      ? `Chave Pix (Aleatória):\n${currentUser.chavePix}`
+                      : `Chave Pix não configurada pelo gestor.`;
+                    const msg = `Olá, ${cobrarVenda.cliente}!\n\nSegue a cobrança do seu pedido realizado na ${currentUser?.empresaNome || 'DTF TÊXTIL'}:\n\nPedido: ${code}\n- Produto: ${cobrarVenda.produto}\n- Quantidade: ${cobrarVenda.quantidade}\n- Valor Unitário: ${formatCurrency(cobrarVenda.valorUnitario)}\n- Total a pagar: ${formatCurrency(total)}\n\n${pixText}\n\nCaso tenha alguma dúvida, estamos à disposição! Obrigado pela preferência.`;
+                    
+                    const mailLink = `mailto:${clientData?.email || ''}?subject=${encodeURIComponent('Cobrança do Pedido ' + code)}&body=${encodeURIComponent(msg)}`;
+                    window.open(mailLink, '_blank');
+                  }}
+                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/15 cursor-pointer"
+                >
+                  <Mail className="w-4 h-4" /> Enviar por Email
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
