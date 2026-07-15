@@ -57,7 +57,8 @@ export default function OrcamentosTab({ clientes, produtos, currentUser, current
     if (trimmed.includes('drive.google.com')) {
       const matchId = trimmed.match(/\/file\/d\/([a-zA-Z0-9-_]+)/) || trimmed.match(/id=([a-zA-Z0-9-_]+)/);
       if (matchId && matchId[1]) {
-        return `https://docs.google.com/uc?export=view&id=${matchId[1]}`;
+        // lh3.googleusercontent.com/d/FILE_ID serves ONLY the raw image directly, perfect as a logo img src
+        return `https://lh3.googleusercontent.com/d/${matchId[1]}`;
       }
     }
     return trimmed;
@@ -466,6 +467,52 @@ export default function OrcamentosTab({ clientes, produtos, currentUser, current
       line-height: 1.5;
       font-style: italic;
     }
+    .pdf-footer {
+      margin-top: 60px;
+      border-top: 2px solid #e2e8f0;
+      padding-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer-company-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .footer-logo {
+      height: 48px;
+      width: auto;
+      max-width: 120px;
+      object-fit: contain;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      padding: 2px;
+      background: #f8fafc;
+    }
+    .footer-text {
+      font-size: 10px;
+      color: #475569;
+      line-height: 1.5;
+    }
+    .footer-text h4 {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 4px 0;
+      text-transform: uppercase;
+    }
+    .footer-credits {
+      text-align: right;
+      font-size: 10px;
+      color: #64748b;
+      line-height: 1.4;
+    }
+    .footer-credits a {
+      color: #4f46e5;
+      text-decoration: underline;
+      font-weight: bold;
+    }
     @media print {
       body {
         padding: 0;
@@ -475,19 +522,15 @@ export default function OrcamentosTab({ clientes, produtos, currentUser, current
 </head>
 <body>
   <div class="container">
-    <div class="header">
+    <div class="header" style="align-items: center;">
       <div class="logo-area">
-        <h1>SISTEMA DTF TÊXTIL</h1>
-        <p>Estamparia de Alta Definição</p>
-        <div class="company-details">
-          <div>CNPJ: 12.345.678/0001-99</div>
-          <div>Contato: contato@dtftextil.com.br</div>
-        </div>
+        <div class="badge" style="font-size: 11px; padding: 5px 14px; margin-bottom: 0;">Documento de Orçamento</div>
+        <h2 style="font-size: 16px; font-weight: bold; margin: 8px 0 0 0; color: #4f46e5; font-family: monospace;">Orçamento: ${quoteCode}</h2>
       </div>
       <div class="invoice-info">
-        <div class="badge">Documento de Orçamento</div>
         <div class="info-row">Data de Emissão: <strong>${dateStr}</strong></div>
         <div class="info-row">Válido até: <strong>${validStr}</strong></div>
+        ${currentVendedor ? `<div class="info-row" style="color: #4f46e5; font-weight: bold; margin-top: 6px;">Vendedor: ${currentVendedor.nome}</div>` : ''}
       </div>
     </div>
 
@@ -534,11 +577,33 @@ export default function OrcamentosTab({ clientes, produtos, currentUser, current
     </div>
 
     ${includeNotes && notes ? `
-    <div class="notes-card">
+    <div class="notes-card" style="margin-bottom: 30px;">
       <div class="notes-title">Observações e Termos</div>
       <div class="notes-content">${notes}</div>
     </div>
     ` : ''}
+
+    <div class="pdf-footer">
+      <div class="footer-company-info">
+        ${currentUser?.empresaLogo ? `
+          <img 
+            src="${formatLogoUrl(currentUser.empresaLogo)}" 
+            alt="Logo Empresa" 
+            class="footer-logo"
+            onerror="this.style.display='none'"
+          />
+        ` : ''}
+        <div class="footer-text">
+          <h4>${currentUser?.empresaNome || 'SISTEMA DTF TÊXTIL'}</h4>
+          <div>CNPJ: ${currentUser?.empresaCnpj || '12.345.678/0001-99'}</div>
+          <div>Contato: ${currentUser?.email || 'contato@dtftextil.com.br'}</div>
+        </div>
+      </div>
+      <div class="footer-credits">
+        <div>Este sistema foi criado por</div>
+        <div><a href="https://dtftextil.netlify.app" target="_blank">https://dtftextil.netlify.app</a></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -901,41 +966,19 @@ export default function OrcamentosTab({ clientes, produtos, currentUser, current
           <div className="p-8 bg-white flex-1 space-y-6 text-slate-800 print:p-0 font-sans" id="invoice-paper-view">
             
             {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b border-slate-200/85">
-              <div className="flex items-start gap-3">
-                {currentUser?.empresaLogo && (
-                  <div className="bg-slate-50 p-1 rounded-lg border border-slate-200/60 shrink-0">
-                    <img 
-                      src={formatLogoUrl(currentUser.empresaLogo)} 
-                      alt="Logo Empresa" 
-                      referrerPolicy="no-referrer"
-                      className="h-12 w-auto max-w-[120px] object-contain rounded"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  </div>
-                )}
-                <div>
-                  <h3 className="text-xl font-extrabold text-slate-900 tracking-tight uppercase">
-                    {currentUser?.empresaNome || 'SISTEMA DTF TÊXTIL'}
-                  </h3>
-                  <p className="text-[11px] text-indigo-600 font-bold uppercase tracking-widest mt-0.5">
-                    {currentUser?.empresaNome ? 'Estamparia Personalizada' : 'Estamparia de Alta Definição'}
-                  </p>
-                  <div className="text-[10px] text-slate-400 mt-2 font-mono">
-                    <p>CNPJ: {currentUser?.empresaCnpj || '12.345.678/0001-99'}</p>
-                    <p>Contato: {currentUser?.email || 'contato@dtftextil.com.br'}</p>
-                  </div>
-                </div>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pb-6 border-b border-slate-200/85">
+              <div className="text-center sm:text-left">
+                <span className="inline-block px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-extrabold rounded-full uppercase tracking-wider">
+                  Documento de Orçamento
+                </span>
+                <h3 className="text-lg font-extrabold text-slate-900 font-mono mt-2" id="preview-quote-code">
+                  Orçamento: {quoteCode}
+                </h3>
               </div>
 
-              <div className="text-right sm:text-right">
-                <span className="inline-block px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-extrabold rounded-full uppercase tracking-wider mb-2">
-                  Orçamento: {quoteCode}
-                </span>
-                <p className="text-xs text-slate-500 font-medium">Data de Emissão: <strong className="text-slate-800 font-bold">{new Date().toLocaleDateString('pt-BR')}</strong></p>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">Válido até: <strong className="text-slate-800 font-bold">{new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR')}</strong></p>
+              <div className="text-center sm:text-right text-xs text-slate-500 space-y-0.5">
+                <p className="font-medium">Data de Emissão: <strong className="text-slate-800 font-bold">{new Date().toLocaleDateString('pt-BR')}</strong></p>
+                <p className="font-medium">Válido até: <strong className="text-slate-800 font-bold">{new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR')}</strong></p>
                 {currentVendedor && (
                   <p className="text-[10px] text-indigo-600 font-bold mt-1.5 uppercase">Vendedor: {currentVendedor.nome} ({currentVendedor.registro})</p>
                 )}
@@ -1049,6 +1092,46 @@ export default function OrcamentosTab({ clientes, produtos, currentUser, current
                 </div>
               </div>
             )}
+
+            {/* Footer */}
+            <div className="pt-6 mt-8 border-t border-slate-200/80 flex flex-col sm:flex-row justify-between items-center gap-4" id="preview-invoice-footer">
+              <div className="flex items-center gap-3">
+                {currentUser?.empresaLogo && (
+                  <div className="bg-slate-50 p-1 rounded-lg border border-slate-200/60 shrink-0">
+                    <img 
+                      src={formatLogoUrl(currentUser.empresaLogo)} 
+                      alt="Logo Empresa" 
+                      referrerPolicy="no-referrer"
+                      className="h-10 w-auto max-w-[100px] object-contain rounded"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="text-left">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase">
+                    {currentUser?.empresaNome || 'SISTEMA DTF TÊXTIL'}
+                  </h4>
+                  <div className="text-[9px] text-slate-400 font-mono mt-0.5">
+                    <span>CNPJ: {currentUser?.empresaCnpj || '12.345.678/0001-99'}</span>
+                    <span className="mx-2">•</span>
+                    <span>Contato: {currentUser?.email || 'contato@dtftextil.com.br'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-center sm:text-right text-[10px] text-slate-400">
+                <p className="font-medium">Este sistema foi criado por</p>
+                <a 
+                  href="https://dtftextil.netlify.app" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="font-bold text-indigo-600 hover:text-indigo-700 transition-colors underline"
+                >
+                  https://dtftextil.netlify.app
+                </a>
+              </div>
+            </div>
 
           </div>
 

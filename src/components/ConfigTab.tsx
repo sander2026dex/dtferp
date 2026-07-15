@@ -42,7 +42,8 @@ export function formatGoogleDriveLink(url: string): string {
   if (trimmed.includes('drive.google.com')) {
     const matchId = trimmed.match(/\/file\/d\/([a-zA-Z0-9-_]+)/) || trimmed.match(/id=([a-zA-Z0-9-_]+)/);
     if (matchId && matchId[1]) {
-      return `https://docs.google.com/uc?export=view&id=${matchId[1]}`;
+      // lh3.googleusercontent.com/d/FILE_ID serves ONLY the raw image directly, perfect as a logo img src
+      return `https://lh3.googleusercontent.com/d/${matchId[1]}`;
     }
   }
   return trimmed;
@@ -79,6 +80,21 @@ export default function ConfigTab({
   });
   const [vendedorError, setVendedorError] = useState('');
   const [vendedorSuccess, setVendedorSuccess] = useState('');
+  const [copiedVendedorId, setCopiedVendedorId] = useState<string | null>(null);
+
+  const handleCopyAccessLink = (v: Vendedor) => {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const accessLink = `${baseUrl}?vEmail=${encodeURIComponent(v.email || v.registro)}&vPass=${encodeURIComponent(v.senha || '123456')}&vendedor=true`;
+    
+    // Copy a complete formatted WhatsApp/Email invitation message
+    const inviteText = `Olá, ${v.nome}! 🚀\nSeu acesso como Vendedor(a) foi criado no sistema *${currentUser.empresaNome || 'DTF Têxtil'}*.\n\nUse o link de acesso abaixo para entrar automaticamente sem precisar digitar suas credenciais:\n🔗 *Link de Acesso:* ${accessLink}\n\n*Dados de login caso precise:*\n📧 E-mail/Registro: ${v.email || v.registro}\n🔑 Senha: ${v.senha || '123456'}\n\nBoas vendas! 📈`;
+    
+    navigator.clipboard.writeText(inviteText);
+    setCopiedVendedorId(v.id);
+    setTimeout(() => {
+      setCopiedVendedorId(null);
+    }, 2000);
+  };
 
   // Save Company settings
   const handleSaveCompany = (e: React.FormEvent) => {
@@ -611,6 +627,27 @@ export default function ConfigTab({
                         </td>
                         <td className="py-3 pr-2 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleCopyAccessLink(v)}
+                              className={`p-1.5 px-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 text-[10px] font-bold ${
+                                copiedVendedorId === v.id
+                                  ? 'bg-emerald-50 text-emerald-600 border border-emerald-250/50'
+                                  : 'hover:bg-indigo-50 text-indigo-600 hover:text-indigo-700 border border-indigo-100/30'
+                              }`}
+                              title="Gerar e Copiar Link de Acesso com Credenciais para WhatsApp"
+                            >
+                              {copiedVendedorId === v.id ? (
+                                <>
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>Copiado!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <LinkIcon className="w-3 h-3" />
+                                  <span>Gerar Link</span>
+                                </>
+                              )}
+                            </button>
                             <button
                               onClick={() => handleEditVendedorClick(v)}
                               className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-slate-850 rounded-lg transition-colors cursor-pointer"

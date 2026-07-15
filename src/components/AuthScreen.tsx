@@ -30,6 +30,7 @@ interface AuthScreenProps {
 export default function AuthScreen({ onAuthSuccess, onGoBack, initialMode = 'login' }: AuthScreenProps) {
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [isVendedorLogin, setIsVendedorLogin] = useState(false);
+  const [hasPreloadedCredentials, setHasPreloadedCredentials] = useState(false);
   
   // Inputs
   const [email, setEmail] = useState('');
@@ -47,6 +48,24 @@ export default function AuthScreen({ onAuthSuccess, onGoBack, initialMode = 'log
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [deviceBlocked, setDeviceBlocked] = useState(false);
+
+  // Check URL query parameters for preloaded salesperson or user credentials
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pEmail = params.get('vEmail') || params.get('email');
+    const pPass = params.get('vPass') || params.get('senha') || params.get('password');
+    const isV = params.get('vendedor') === 'true' || params.get('isVendedor') === 'true';
+
+    if (pEmail || pPass || isV) {
+      if (pEmail) setEmail(pEmail);
+      if (pPass) setPassword(pPass);
+      if (isV) {
+        setIsVendedorLogin(true);
+      }
+      setIsLogin(true);
+      setHasPreloadedCredentials(true);
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,6 +170,19 @@ export default function AuthScreen({ onAuthSuccess, onGoBack, initialMode = 'log
         <div className="bg-white py-8 px-4 border border-slate-200/80 shadow-2xl rounded-3xl sm:px-10">
           
           <form className="space-y-4" onSubmit={handleSubmit} id="auth-form-body">
+            
+            {/* Preloaded Credentials Alert */}
+            {hasPreloadedCredentials && !success && !error && (
+              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-start gap-2.5 text-indigo-900 text-xs font-semibold">
+                <KeyRound className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <span className="block font-bold text-indigo-950">Acesso Vendedor Pré-carregado!</span>
+                  <span className="text-[10px] text-indigo-700 font-medium block leading-normal">
+                    Seu link de acesso preencheu seu e-mail/código e senha automaticamente. Clique em "Acessar Painel" para entrar.
+                  </span>
+                </div>
+              </div>
+            )}
             
             {/* Success Box */}
             {success && (
