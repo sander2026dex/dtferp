@@ -142,7 +142,8 @@ export default function AdminTab() {
     
     const cleanPhone = user.celular.replace(/\D/g, '');
     const phoneWithCountry = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-    window.open(`https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodeURIComponent(text)}`, '_blank');
+    // wa.me format is universally compatible and automatically opens either regular WhatsApp, WhatsApp Business, or WhatsApp Web depending on the device.
+    window.open(`https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   // Email Billing
