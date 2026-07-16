@@ -780,10 +780,15 @@ export default function App() {
             produtos={produtos} 
             clientes={clientes} 
             vendedores={vendedores}
+            currentUser={currentUser}
+            currentVendedor={currentVendedor}
             onAddVenda={handleAddVenda} 
             onEditVenda={handleEditVenda} 
             onDeleteVenda={handleDeleteVenda} 
             onToggleStatus={handleToggleVendaStatus}
+            onAddVendedor={handleAddVendedor}
+            onEditVendedor={handleEditVendedor}
+            onDeleteVendedor={handleDeleteVendedor}
           />
         )}
         {activeTab === 'produtos' && (

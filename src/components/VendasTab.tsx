@@ -20,6 +20,9 @@ interface VendasTabProps {
   onEditVenda: (venda: Venda) => void;
   onDeleteVenda: (id: string) => void;
   onToggleStatus: (id: string) => void;
+  onAddVendedor?: (vendedor: Omit<Vendedor, 'id' | 'createdAt'>) => void;
+  onEditVendedor?: (vendedor: Vendedor) => void;
+  onDeleteVendedor?: (id: string) => void;
 }
 
 export default function VendasTab({
@@ -33,6 +36,9 @@ export default function VendasTab({
   onEditVenda,
   onDeleteVenda,
   onToggleStatus,
+  onAddVendedor,
+  onEditVendedor,
+  onDeleteVendedor,
 }: VendasTabProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Concluído' | 'Pendente'>('Todos');
@@ -42,6 +48,91 @@ export default function VendasTab({
   // Billing (Cobrança) modal states
   const [cobrarVenda, setCobrarVenda] = useState<Venda | null>(null);
   const [successCopied, setSuccessCopied] = useState(false);
+
+  // Vendedor Modal & Quick Creation States
+  const [isVendedoresModalOpen, setIsVendedoresModalOpen] = useState(false);
+  const [vendedorFilter, setVendedorFilter] = useState('');
+  const [copiedVendedorId, setCopiedVendedorId] = useState<string | null>(null);
+  const [isAddingVendedor, setIsAddingVendedor] = useState(false);
+  const [vendedorError, setVendedorError] = useState('');
+  const [vendedorSuccess, setVendedorSuccess] = useState('');
+  const [vendedorForm, setVendedorForm] = useState({
+    nome: '',
+    registro: `VND-${Math.floor(1000 + Math.random() * 9000)}`,
+    comissao: '5',
+    telefone: '',
+    email: '',
+    senha: '123456',
+    status: 'Ativo' as 'Ativo' | 'Pendente' | 'Bloqueado',
+  });
+
+  const handleCopyAccessLink = (v: Vendedor) => {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const accessLink = `${baseUrl}?vEmail=${encodeURIComponent(v.email || v.registro)}&vPass=${encodeURIComponent(v.senha || '123456')}&vendedor=true`;
+    
+    // Copy a complete formatted WhatsApp/Email invitation message
+    const inviteText = `Olá, ${v.nome}! 🚀\nSeu acesso como Vendedor(a) foi criado no sistema *${currentUser?.empresaNome || 'DTF Têxtil'}*.\n\nUse o link de acesso abaixo para entrar automaticamente sem precisar digitar suas credenciais:\n🔗 *Link de Acesso:* ${accessLink}\n\n*Dados de login caso precise:*\n📧 E-mail/Registro: ${v.email || v.registro}\n🔑 Senha: ${v.senha || '123456'}\n\nBoas vendas! 📈`;
+    
+    navigator.clipboard.writeText(inviteText);
+    setCopiedVendedorId(v.id);
+    setTimeout(() => {
+      setCopiedVendedorId(null);
+    }, 2000);
+  };
+
+  const handleAddVendedorSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setVendedorError('');
+    setVendedorSuccess('');
+
+    if (!vendedorForm.nome || !vendedorForm.registro) {
+      setVendedorError('Nome e Registro/Matrícula são obrigatórios!');
+      return;
+    }
+
+    // Check if registration or email already exists
+    const regExists = vendedores.some(v => v.registro.toLowerCase() === vendedorForm.registro.toLowerCase());
+    if (regExists) {
+      setVendedorError('Código de Registro já cadastrado!');
+      return;
+    }
+
+    if (vendedorForm.email) {
+      const emailExists = vendedores.some(v => v.email?.toLowerCase() === vendedorForm.email.toLowerCase());
+      if (emailExists) {
+        setVendedorError('E-mail já está sendo utilizado por outro vendedor!');
+        return;
+      }
+    }
+
+    if (onAddVendedor) {
+      onAddVendedor({
+        nome: vendedorForm.nome,
+        registro: vendedorForm.registro,
+        comissao: parseFloat(vendedorForm.comissao) || 0,
+        telefone: vendedorForm.telefone,
+        email: vendedorForm.email,
+        senha: vendedorForm.senha,
+        status: vendedorForm.status,
+      });
+
+      setVendedorSuccess('Vendedor cadastrado com sucesso!');
+      
+      // Reset form
+      setVendedorForm({
+        nome: '',
+        registro: `VND-${Math.floor(1000 + Math.random() * 9000)}`,
+        comissao: '5',
+        telefone: '',
+        email: '',
+        senha: '123456',
+        status: 'Ativo',
+      });
+      setIsAddingVendedor(false);
+
+      setTimeout(() => setVendedorSuccess(''), 3000);
+    }
+  };
 
   // Form State
   const [formData, setFormData] = useState({
@@ -57,7 +148,9 @@ export default function VendasTab({
   // Filter sales to salesperson's own sales if they are logged in as vendedor
   const vendedorSales = currentVendedor 
     ? vendas.filter(v => v.vendedor?.trim().toLowerCase() === currentVendedor.nome.trim().toLowerCase())
-    : vendas;
+    : (vendedorFilter
+        ? vendas.filter(v => v.vendedor?.trim().toLowerCase() === vendedorFilter.trim().toLowerCase())
+        : vendas);
 
   // Calculate statistics
   const totalReceita = vendedorSales
@@ -163,30 +256,41 @@ export default function VendasTab({
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex items-center justify-between" id="vendas-stat-action">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4" id="vendas-stat-action">
           <div className="space-y-1">
-            <h4 className="text-sm font-bold text-slate-800">Nova Venda</h4>
-            <p className="text-xs text-slate-500">Registre novos pedidos de DTF</p>
+            <h4 className="text-sm font-bold text-slate-800 font-display">Nova Venda / Ações</h4>
+            <p className="text-xs text-slate-500">Registre vendas e gerencie vendedores</p>
           </div>
-          <button
-            onClick={() => {
-              setEditingVenda(null);
-              setFormData({
-                data: new Date().toISOString().split('T')[0],
-                cliente: clientes[0]?.nome || '',
-                produto: produtos[0]?.nome || '',
-                quantidade: '1',
-                valorUnitario: produtos[0]?.precoVenda.toString() || '',
-                status: 'Concluído',
-                vendedor: currentVendedor ? currentVendedor.nome : '',
-              });
-              setIsFormOpen(true);
-            }}
-            className="p-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-600/10 flex items-center gap-1.5 text-xs font-bold"
-            id="add-venda-trigger-btn"
-          >
-            <Plus className="w-4 h-4" /> Registrar Venda
-          </button>
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            {!currentVendedor && (
+              <button
+                onClick={() => setIsVendedoresModalOpen(true)}
+                className="flex-1 sm:flex-initial px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-all border border-indigo-150/40 flex items-center justify-center gap-1.5 text-xs font-bold cursor-pointer"
+                id="vendedores-trigger-btn"
+              >
+                <User className="w-4 h-4 text-indigo-600" /> Vendedores
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setEditingVenda(null);
+                setFormData({
+                  data: new Date().toISOString().split('T')[0],
+                  cliente: clientes[0]?.nome || '',
+                  produto: produtos[0]?.nome || '',
+                  quantidade: '1',
+                  valorUnitario: produtos[0]?.precoVenda.toString() || '',
+                  status: 'Concluído',
+                  vendedor: currentVendedor ? currentVendedor.nome : '',
+                });
+                setIsFormOpen(true);
+              }}
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-600/10 flex items-center justify-center gap-1.5 text-xs font-bold"
+              id="add-venda-trigger-btn"
+            >
+              <Plus className="w-4 h-4" /> Registrar Venda
+            </button>
+          </div>
         </div>
       </div>
 
@@ -205,21 +309,40 @@ export default function VendasTab({
           />
         </div>
 
-        {/* Status Filters */}
-        <div className="flex gap-2" id="status-filters">
-          {(['Todos', 'Concluído', 'Pendente'] as const).map(status => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                statusFilter === status
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {status}
-            </button>
-          ))}
+        {/* Status & Salesperson Filters */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end" id="status-filters">
+          {vendedores.length > 0 && !currentVendedor && (
+            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/60 shrink-0">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider pl-0.5">Filtrar:</span>
+              <select
+                value={vendedorFilter}
+                onChange={(e) => setVendedorFilter(e.target.value)}
+                className="bg-transparent border-none text-xs font-bold text-indigo-600 focus:outline-none cursor-pointer pr-1"
+                id="vendedor-filter-select"
+              >
+                <option value="">Todos os Vendedores</option>
+                {vendedores.map(v => (
+                  <option key={v.id} value={v.nome}>{v.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            {(['Todos', 'Concluído', 'Pendente'] as const).map(status => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                  statusFilter === status
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -693,6 +816,288 @@ export default function VendasTab({
                   <Mail className="w-4 h-4" /> Enviar por Email
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Vendedores Modal */}
+      <AnimatePresence>
+        {isVendedoresModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto"
+            id="vendedores-mgmt-modal"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white rounded-3xl p-6 w-full max-w-2xl border border-slate-100 shadow-2xl relative space-y-6 my-8"
+            >
+              <button 
+                onClick={() => {
+                  setIsVendedoresModalOpen(false);
+                  setIsAddingVendedor(false);
+                  setVendedorError('');
+                  setVendedorSuccess('');
+                }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all absolute top-6 right-6 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest block font-sans">Administração</span>
+                <h3 className="text-lg font-bold text-slate-900 font-display">
+                  Gestão de Vendedores & Links de Acesso
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Gerencie sua equipe, cadastre novos vendedores e gere links de login automático com comissão integrada.
+                </p>
+              </div>
+
+              {/* Error & Success Messages */}
+              {vendedorError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl text-center">
+                  ⚠️ {vendedorError}
+                </div>
+              )}
+              {vendedorSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-xl text-center">
+                  ✅ {vendedorSuccess}
+                </div>
+              )}
+
+              {/* Quick Toggle for Add Form */}
+              <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  {isAddingVendedor ? 'Registrar Novo Vendedor' : `Vendedores Cadastrados (${vendedores.length})`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingVendedor(!isAddingVendedor);
+                    setVendedorError('');
+                    setVendedorSuccess('');
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    isAddingVendedor 
+                      ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' 
+                      : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/10'
+                  }`}
+                >
+                  {isAddingVendedor ? 'Voltar para Lista' : 'Adicionar Vendedor'}
+                </button>
+              </div>
+
+              {isAddingVendedor ? (
+                /* Add Vendedor Form */
+                <form onSubmit={handleAddVendedorSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-600">Nome do Vendedor *</label>
+                    <input
+                      type="text"
+                      required
+                      value={vendedorForm.nome}
+                      onChange={(e) => setVendedorForm({...vendedorForm, nome: e.target.value})}
+                      placeholder="Ex: Carlos Silva"
+                      className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-600 font-mono">Registro / Matrícula *</label>
+                    <input
+                      type="text"
+                      required
+                      value={vendedorForm.registro}
+                      onChange={(e) => setVendedorForm({...vendedorForm, registro: e.target.value})}
+                      placeholder="Ex: VND-1001"
+                      className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-600">Comissão de Venda (%) *</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={vendedorForm.comissao}
+                      onChange={(e) => setVendedorForm({...vendedorForm, comissao: e.target.value})}
+                      placeholder="Ex: 5"
+                      className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-600">WhatsApp / Telefone</label>
+                    <input
+                      type="tel"
+                      value={vendedorForm.telefone}
+                      onChange={(e) => setVendedorForm({...vendedorForm, telefone: e.target.value})}
+                      placeholder="Ex: 11999998888"
+                      className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-600 font-mono">E-mail (Para login manual)</label>
+                    <input
+                      type="email"
+                      value={vendedorForm.email}
+                      onChange={(e) => setVendedorForm({...vendedorForm, email: e.target.value})}
+                      placeholder="Ex: carlos@empresa.com"
+                      className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-600">Senha de Acesso</label>
+                    <input
+                      type="text"
+                      required
+                      value={vendedorForm.senha}
+                      onChange={(e) => setVendedorForm({...vendedorForm, senha: e.target.value})}
+                      placeholder="Ex: 123456"
+                      className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                    />
+                  </div>
+
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-slate-600">Status da Conta</label>
+                    <select
+                      value={vendedorForm.status}
+                      onChange={(e) => setVendedorForm({...vendedorForm, status: e.target.value as any})}
+                      className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 cursor-pointer"
+                    >
+                      <option value="Ativo">Ativo (Permitir Acesso)</option>
+                      <option value="Pendente">Pendente (Aguardando Liberação)</option>
+                      <option value="Bloqueado">Bloqueado (Negar Acesso)</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2 pt-2 flex gap-3 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingVendedor(false)}
+                      className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold border border-slate-200 cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs"
+                    >
+                      Cadastrar Vendedor
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* Vendedores List */
+                <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
+                  {vendedores.length > 0 ? (
+                    <div className="divide-y divide-slate-100 border border-slate-150 rounded-2xl overflow-hidden">
+                      {vendedores.map((v) => {
+                        // Calculate performance stats for this seller
+                        const sellerSales = vendas.filter(sale => sale.vendedor?.trim().toLowerCase() === v.nome.trim().toLowerCase());
+                        const totalSelled = sellerSales.reduce((acc, curr) => acc + (curr.quantidade * curr.valorUnitario), 0);
+                        const totalCommission = totalSelled * (v.comissao / 100);
+
+                        return (
+                          <div key={v.id} className="p-4 bg-slate-50/45 hover:bg-slate-50/90 transition-colors flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div className="space-y-1 text-left">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-slate-800 text-sm">{v.nome}</span>
+                                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                  {v.registro}
+                                </span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                                  v.status === 'Ativo' 
+                                    ? 'bg-emerald-50 text-emerald-700' 
+                                    : v.status === 'Pendente' 
+                                    ? 'bg-amber-50 text-amber-700' 
+                                    : 'bg-rose-50 text-rose-700'
+                                }`}>
+                                  {v.status}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-x-3 text-[11px] text-slate-500">
+                                <span>Comissão: <strong className="text-indigo-600 font-bold">{v.comissao}%</strong></span>
+                                {v.email && <span>E-mail: <strong className="text-slate-700">{v.email}</strong></span>}
+                              </div>
+                              <div className="text-[11px] text-slate-400 font-medium">
+                                Vendas associadas: <strong className="text-slate-700">{sellerSales.length} pedidos</strong>
+                                <span className="mx-1.5">•</span>
+                                Faturamento: <strong className="text-emerald-600">{formatCurrency(totalSelled)}</strong>
+                                <span className="mx-1.5">•</span>
+                                Comissão devida: <strong className="text-indigo-600 font-mono">{formatCurrency(totalCommission)}</strong>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+                              {/* Filter Sales by this Vendedor */}
+                              <button
+                                onClick={() => {
+                                  setVendedorFilter(vendedorFilter === v.nome ? '' : v.nome);
+                                  setIsVendedoresModalOpen(false);
+                                }}
+                                className={`px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 border ${
+                                  vendedorFilter === v.nome 
+                                    ? 'bg-indigo-600 border-indigo-600 text-white' 
+                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                }`}
+                                title="Filtrar vendas por este vendedor"
+                              >
+                                {vendedorFilter === v.nome ? 'Filtrado ✓' : 'Filtrar'}
+                              </button>
+
+                              {/* Copy auto login credentials & WhatsApp link */}
+                              <button
+                                onClick={() => handleCopyAccessLink(v)}
+                                className={`px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 border ${
+                                  copiedVendedorId === v.id
+                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                    : 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-500'
+                                }`}
+                                title="Copiar Link de Login Automático do Vendedor"
+                              >
+                                {copiedVendedorId === v.id ? 'Copiado!' : 'Copiar Link'}
+                              </button>
+
+                              {/* Delete option */}
+                              {onDeleteVendedor && (
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Tem certeza que deseja excluir o vendedor ${v.nome}? Ele perderá o acesso imediatamente.`)) {
+                                      onDeleteVendedor(v.id);
+                                    }
+                                  }}
+                                  className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-transparent hover:border-rose-200 rounded-xl transition-all cursor-pointer"
+                                  title="Excluir Vendedor"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-12 text-center text-slate-400 space-y-2">
+                      <AlertTriangle className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="font-semibold text-sm">Nenhum vendedor cadastrado</p>
+                      <p className="text-xs">Clique no botão acima para adicionar seu primeiro vendedor.</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
