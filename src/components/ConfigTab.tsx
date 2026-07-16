@@ -83,8 +83,7 @@ export default function ConfigTab({
   const [copiedVendedorId, setCopiedVendedorId] = useState<string | null>(null);
 
   const handleCopyAccessLink = (v: Vendedor) => {
-    const baseUrl = window.location.origin + window.location.pathname;
-    const accessLink = `${baseUrl}?vEmail=${encodeURIComponent(v.email || v.registro)}&vPass=${encodeURIComponent(v.senha || '123456')}&vendedor=true`;
+    const accessLink = `${window.location.origin}/#/vendas?vEmail=${encodeURIComponent(v.email || v.registro)}&vPass=${encodeURIComponent(v.senha || '123456')}&vendedor=true`;
     
     // Copy a complete formatted WhatsApp/Email invitation message
     const inviteText = `Olá, ${v.nome}! 🚀\nSeu acesso como Vendedor(a) foi criado no sistema *${currentUser.empresaNome || 'DTF Têxtil'}*.\n\nUse o link de acesso abaixo para entrar automaticamente sem precisar digitar suas credenciais:\n🔗 *Link de Acesso:* ${accessLink}\n\n*Dados de login caso precise:*\n📧 E-mail/Registro: ${v.email || v.registro}\n🔑 Senha: ${v.senha || '123456'}\n\nBoas vendas! 📈`;

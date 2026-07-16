@@ -67,8 +67,7 @@ export default function VendasTab({
   });
 
   const handleCopyAccessLink = (v: Vendedor) => {
-    const baseUrl = window.location.origin + window.location.pathname;
-    const accessLink = `${baseUrl}?vEmail=${encodeURIComponent(v.email || v.registro)}&vPass=${encodeURIComponent(v.senha || '123456')}&vendedor=true`;
+    const accessLink = `${window.location.origin}/#/vendas?vEmail=${encodeURIComponent(v.email || v.registro)}&vPass=${encodeURIComponent(v.senha || '123456')}&vendedor=true`;
     
     // Copy a complete formatted WhatsApp/Email invitation message
     const inviteText = `Olá, ${v.nome}! 🚀\nSeu acesso como Vendedor(a) foi criado no sistema *${currentUser?.empresaNome || 'DTF Têxtil'}*.\n\nUse o link de acesso abaixo para entrar automaticamente sem precisar digitar suas credenciais:\n🔗 *Link de Acesso:* ${accessLink}\n\n*Dados de login caso precise:*\n📧 E-mail/Registro: ${v.email || v.registro}\n🔑 Senha: ${v.senha || '123456'}\n\nBoas vendas! 📈`;
@@ -776,45 +775,102 @@ export default function VendasTab({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                {/* WhatsApp */}
-                <button
-                  onClick={() => {
-                    const clientData = clientes.find(c => c.nome.trim().toLowerCase() === cobrarVenda.cliente.trim().toLowerCase());
-                    const phoneStr = clientData?.telefone ? clientData.telefone.replace(/\D/g, '') : '';
-                    const code = cobrarVenda.id.replace('v_', 'PED-').toUpperCase();
-                    const total = cobrarVenda.quantidade * cobrarVenda.valorUnitario;
-                    const pixText = currentUser?.chavePix 
-                      ? `🔑 *Chave Pix (Aleatória):*\n${currentUser.chavePix}`
-                      : `⚠️ *Chave Pix não configurada pelo gestor.*`;
-                    const msg = `Olá, *${cobrarVenda.cliente}*!\n\nSegue a cobrança do seu pedido realizado na *${currentUser?.empresaNome || 'DTF TÊXTIL'}*:\n\n📦 *Pedido:* ${code}\n• *Produto:* ${cobrarVenda.produto}\n• *Quantidade:* ${cobrarVenda.quantidade}\n• *Valor Unitário:* ${formatCurrency(cobrarVenda.valorUnitario)}\n• *Total a pagar: ${formatCurrency(total)}*\n\n${pixText}\n\nCaso tenha alguma dúvida, estamos à disposição! Obrigado pela preferência.`;
-                    
-                    const whLink = `https://api.whatsapp.com/send?phone=${phoneStr ? (phoneStr.startsWith('55') ? phoneStr : '55' + phoneStr) : ''}&text=${encodeURIComponent(msg)}`;
-                    window.open(whLink, '_blank');
-                  }}
-                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/15 cursor-pointer"
-                >
-                  <MessageSquare className="w-4 h-4" /> Enviar por WhatsApp
-                </button>
+              <div className="space-y-3">
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Opções de Transmissão / Envio:</span>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* WhatsApp App */}
+                  <button
+                    onClick={() => {
+                      const clientData = clientes.find(c => c.nome.trim().toLowerCase() === cobrarVenda.cliente.trim().toLowerCase());
+                      let phoneStr = clientData?.telefone ? clientData.telefone.replace(/\D/g, '') : '';
+                      if (phoneStr && !phoneStr.startsWith('55') && phoneStr.length >= 10) {
+                        phoneStr = '55' + phoneStr;
+                      }
+                      const code = cobrarVenda.id.replace('v_', 'PED-').toUpperCase();
+                      const total = cobrarVenda.quantidade * cobrarVenda.valorUnitario;
+                      const pixText = currentUser?.chavePix 
+                        ? `🔑 *Chave Pix (Aleatória):*\n${currentUser.chavePix}`
+                        : `⚠️ *Chave Pix não configurada pelo gestor.*`;
+                      const msg = `Olá, *${cobrarVenda.cliente}*!\n\nSegue a cobrança do seu pedido realizado na *${currentUser?.empresaNome || 'DTF TÊXTIL'}*:\n\n📦 *Pedido:* ${code}\n• *Produto:* ${cobrarVenda.produto}\n• *Quantidade:* ${cobrarVenda.quantidade}\n• *Valor Unitário:* ${formatCurrency(cobrarVenda.valorUnitario)}\n• *Total a pagar: ${formatCurrency(total)}*\n\n${pixText}\n\nCaso tenha alguma dúvida, estamos à disposição! Obrigado pela preferência.`;
+                      
+                      const whLink = `https://api.whatsapp.com/send?phone=${phoneStr}&text=${encodeURIComponent(msg)}`;
+                      window.open(whLink, '_blank');
+                    }}
+                    className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/10 cursor-pointer"
+                    title="Enviar via aplicativo do WhatsApp (Normal ou Business no celular/PC)"
+                  >
+                    <MessageSquare className="w-4 h-4" /> WhatsApp App
+                  </button>
 
-                {/* Email */}
-                <button
-                  onClick={() => {
-                    const clientData = clientes.find(c => c.nome.trim().toLowerCase() === cobrarVenda.cliente.trim().toLowerCase());
-                    const code = cobrarVenda.id.replace('v_', 'PED-').toUpperCase();
-                    const total = cobrarVenda.quantidade * cobrarVenda.valorUnitario;
-                    const pixText = currentUser?.chavePix 
-                      ? `Chave Pix (Aleatória):\n${currentUser.chavePix}`
-                      : `Chave Pix não configurada pelo gestor.`;
-                    const msg = `Olá, ${cobrarVenda.cliente}!\n\nSegue a cobrança do seu pedido realizado na ${currentUser?.empresaNome || 'DTF TÊXTIL'}:\n\nPedido: ${code}\n- Produto: ${cobrarVenda.produto}\n- Quantidade: ${cobrarVenda.quantidade}\n- Valor Unitário: ${formatCurrency(cobrarVenda.valorUnitario)}\n- Total a pagar: ${formatCurrency(total)}\n\n${pixText}\n\nCaso tenha alguma dúvida, estamos à disposição! Obrigado pela preferência.`;
-                    
-                    const mailLink = `mailto:${clientData?.email || ''}?subject=${encodeURIComponent('Cobrança do Pedido ' + code)}&body=${encodeURIComponent(msg)}`;
-                    window.open(mailLink, '_blank');
-                  }}
-                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/15 cursor-pointer"
-                >
-                  <Mail className="w-4 h-4" /> Enviar por Email
-                </button>
+                  {/* WhatsApp Web */}
+                  <button
+                    onClick={() => {
+                      const clientData = clientes.find(c => c.nome.trim().toLowerCase() === cobrarVenda.cliente.trim().toLowerCase());
+                      let phoneStr = clientData?.telefone ? clientData.telefone.replace(/\D/g, '') : '';
+                      if (phoneStr && !phoneStr.startsWith('55') && phoneStr.length >= 10) {
+                        phoneStr = '55' + phoneStr;
+                      }
+                      const code = cobrarVenda.id.replace('v_', 'PED-').toUpperCase();
+                      const total = cobrarVenda.quantidade * cobrarVenda.valorUnitario;
+                      const pixText = currentUser?.chavePix 
+                        ? `🔑 *Chave Pix (Aleatória):*\n${currentUser.chavePix}`
+                        : `⚠️ *Chave Pix não configurada pelo gestor.*`;
+                      const msg = `Olá, *${cobrarVenda.cliente}*!\n\nSegue a cobrança do seu pedido realizado na *${currentUser?.empresaNome || 'DTF TÊXTIL'}*:\n\n📦 *Pedido:* ${code}\n• *Produto:* ${cobrarVenda.produto}\n• *Quantidade:* ${cobrarVenda.quantidade}\n• *Valor Unitário:* ${formatCurrency(cobrarVenda.valorUnitario)}\n• *Total a pagar: ${formatCurrency(total)}*\n\n${pixText}\n\nCaso tenha alguma dúvida, estamos à disposição! Obrigado pela preferência.`;
+                      
+                      const whLink = `https://web.whatsapp.com/send?phone=${phoneStr}&text=${encodeURIComponent(msg)}`;
+                      window.open(whLink, '_blank');
+                    }}
+                    className="py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-700/10 cursor-pointer"
+                    title="Enviar pelo WhatsApp Web no Navegador"
+                  >
+                    <ExternalLink className="w-4 h-4" /> WhatsApp Web
+                  </button>
+
+                  {/* Copy Message */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const code = cobrarVenda.id.replace('v_', 'PED-').toUpperCase();
+                      const total = cobrarVenda.quantidade * cobrarVenda.valorUnitario;
+                      const pixText = currentUser?.chavePix 
+                        ? `🔑 Chave Pix (Aleatória):\n${currentUser.chavePix}`
+                        : `⚠️ Chave Pix não configurada pelo gestor.`;
+                      const msg = `Olá, *${cobrarVenda.cliente}*!\n\nSegue a cobrança do seu pedido realizado na *${currentUser?.empresaNome || 'DTF TÊXTIL'}*:\n\n📦 *Pedido:* ${code}\n• *Produto:* ${cobrarVenda.produto}\n• *Quantidade:* ${cobrarVenda.quantidade}\n• *Valor Unitário:* ${formatCurrency(cobrarVenda.valorUnitario)}\n• *Total a pagar: ${formatCurrency(total)}*\n\n${pixText}\n\nCaso tenha alguma dúvida, estamos à disposição! Obrigado pela preferência.`;
+                      
+                      navigator.clipboard.writeText(msg);
+                      setSuccessCopied(true);
+                      setTimeout(() => setSuccessCopied(false), 2000);
+                    }}
+                    className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      successCopied 
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+                    }`}
+                    title="Copiar texto da mensagem formatada para colar onde quiser"
+                  >
+                    <Copy className="w-4 h-4 text-slate-500" /> {successCopied ? 'Copiado!' : 'Copiar Mensagem'}
+                  </button>
+
+                  {/* Email */}
+                  <button
+                    onClick={() => {
+                      const clientData = clientes.find(c => c.nome.trim().toLowerCase() === cobrarVenda.cliente.trim().toLowerCase());
+                      const code = cobrarVenda.id.replace('v_', 'PED-').toUpperCase();
+                      const total = cobrarVenda.quantidade * cobrarVenda.valorUnitario;
+                      const pixText = currentUser?.chavePix 
+                        ? `Chave Pix (Aleatória):\n${currentUser.chavePix}`
+                        : `Chave Pix não configurada pelo gestor.`;
+                      const msg = `Olá, ${cobrarVenda.cliente}!\n\nSegue a cobrança do seu pedido realizado na ${currentUser?.empresaNome || 'DTF TÊXTIL'}:\n\nPedido: ${code}\n- Produto: ${cobrarVenda.produto}\n- Quantidade: ${cobrarVenda.quantidade}\n- Valor Unitário: ${formatCurrency(cobrarVenda.valorUnitario)}\n- Total a pagar: ${formatCurrency(total)}\n\n${pixText}\n\nCaso tenha alguma dúvida, estamos à disposição! Obrigado pela preferência.`;
+                      
+                      const mailLink = `mailto:${clientData?.email || ''}?subject=${encodeURIComponent('Cobrança do Pedido ' + code)}&body=${encodeURIComponent(msg)}`;
+                      window.open(mailLink, '_blank');
+                    }}
+                    className="py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer"
+                  >
+                    <Mail className="w-4 h-4" /> Enviar por Email
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

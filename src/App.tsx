@@ -77,11 +77,26 @@ export default function App() {
     }
   }, [currentVendedor]);
 
-  const [currentView, setCurrentView] = useState<'landing' | 'login' | 'register'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'login' | 'register'>(() => {
+    const hash = window.location.hash;
+    const path = window.location.pathname;
+    if (hash.startsWith('#/vendas') || hash.startsWith('#vendas') || path === '/vendas') {
+      return 'login';
+    }
+    return 'landing';
+  });
 
-  // Path routing state (to handle `/admin` and navigation)
+  // Path routing state (to handle `#/admin`, `#/vendas` and navigation)
   const [currentPath, setCurrentPath] = useState(() => {
-    return window.location.pathname;
+    const hash = window.location.hash;
+    const path = window.location.pathname;
+    if (hash.startsWith('#/admin') || hash.startsWith('#admin') || path === '/admin') {
+      return '/admin';
+    }
+    if (hash.startsWith('#/vendas') || hash.startsWith('#vendas') || path === '/vendas') {
+      return '/vendas';
+    }
+    return '/';
   });
 
   // Also track if admin is authenticated via the master password
@@ -95,29 +110,26 @@ export default function App() {
   // Handle location changes (URL paths and hashes)
   useEffect(() => {
     const handleLocationChange = () => {
-      setCurrentPath(window.location.pathname);
-    };
-
-    window.addEventListener('popstate', handleLocationChange);
-    
-    // Support hash navigation fallback (for Netlify/SPA compatibility)
-    const handleHashChange = () => {
-      if (window.location.hash === '#/admin' || window.location.hash === '#admin') {
+      const hash = window.location.hash;
+      const path = window.location.pathname;
+      if (hash.startsWith('#/admin') || hash.startsWith('#admin') || path === '/admin') {
         setCurrentPath('/admin');
-      } else if (window.location.hash === '#/' || window.location.hash === '') {
+      } else if (hash.startsWith('#/vendas') || hash.startsWith('#vendas') || path === '/vendas') {
+        setCurrentPath('/vendas');
+      } else {
         setCurrentPath('/');
       }
     };
-    window.addEventListener('hashchange', handleHashChange);
 
-    // Initial check for hash
-    if (window.location.hash === '#/admin' || window.location.hash === '#admin') {
-      setCurrentPath('/admin');
-    }
+    window.addEventListener('hashchange', handleLocationChange);
+    window.addEventListener('popstate', handleLocationChange);
+    
+    // Initial check
+    handleLocationChange();
 
     return () => {
+      window.removeEventListener('hashchange', handleLocationChange);
       window.removeEventListener('popstate', handleLocationChange);
-      window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);
 
@@ -349,9 +361,8 @@ export default function App() {
     setActiveTab('dashboard');
     setIsAdminSessionActive(false);
     sessionStorage.removeItem('dtf_admin_authorized');
-    window.history.pushState(null, '', '/');
+    window.location.hash = '#/';
     setCurrentPath('/');
-    window.location.hash = '';
   };
 
   // Check admin status
@@ -359,6 +370,17 @@ export default function App() {
     currentUser.email.toLowerCase() === 'xboxcarioca@gmail.com' || 
     currentUser.email.toLowerCase() === 'admin@dtf.com'
   ));
+
+  // Synchronize active tab based on path routing
+  useEffect(() => {
+    if (currentUser) {
+      if (currentPath === '/admin' && isAdminUser) {
+        setActiveTab('admin');
+      } else if (currentPath === '/vendas') {
+        setActiveTab('vendas');
+      }
+    }
+  }, [currentPath, currentUser, isAdminUser]);
 
   // --- CRUD OPERATORS ---
 
@@ -549,9 +571,8 @@ export default function App() {
           <div className="text-center pt-2 relative">
             <button
               onClick={() => {
-                window.history.pushState(null, '', '/');
+                window.location.hash = '#/';
                 setCurrentPath('/');
-                window.location.hash = '';
               }}
               className="text-xs font-semibold text-slate-500 hover:text-slate-300 transition-colors"
             >
@@ -563,8 +584,78 @@ export default function App() {
     );
   }
 
+  // A.1 Standalone Admin Panel View (Path matches /admin and session IS active)
+  if (currentPath === '/admin' && isAdminSessionActive) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans" id="admin-standalone-container">
+        {/* Simplified Admin Header */}
+        <header className="sticky top-0 z-40 bg-slate-900 text-white shadow-md border-b border-slate-800">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-md flex items-center justify-center">
+                <Grid3X3 className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-left">
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">Sistema DTF Têxtil</span>
+                <h1 className="text-sm font-extrabold font-display tracking-tight">Painel do Administrador Geral</h1>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <span className="text-xs bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 text-slate-300 font-mono font-semibold">
+                Sessão Admin Ativa
+              </span>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-rose-600/10"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Sair do Painel
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Standalone Admin Stage */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-6 py-8">
+          <AdminTab />
+        </main>
+
+        {/* Small Admin Footer */}
+        <footer className="bg-slate-900 text-slate-400 border-t border-slate-800 py-4 text-center text-xs mt-12">
+          <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <p>© 2026 DTF Têxtil. Painel de Controle Master de SaaS.</p>
+            <p className="font-mono text-[10px] text-indigo-400">STATUS: CONECTADO | CONTROLE DIRETO</p>
+          </div>
+        </footer>
+      </div>
+    );
+  }
+
   // 1. Not Logged In View Router
   if (!currentUser) {
+    if (currentPath === '/vendas') {
+      return (
+        <AuthScreen 
+          onAuthSuccess={(user, vendedor) => {
+            setCurrentUser(user);
+            if (vendedor) {
+              setCurrentVendedor(vendedor);
+              setActiveTab('orcamentos');
+            } else {
+              setCurrentVendedor(null);
+              setActiveTab('dashboard');
+            }
+          }}
+          onGoBack={() => {
+            window.location.hash = '#/';
+            setCurrentPath('/');
+            setCurrentView('landing');
+          }}
+          initialMode="login"
+        />
+      );
+    }
+
     if (currentView === 'landing') {
       return (
         <LandingPage 
@@ -738,7 +829,21 @@ export default function App() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as TabType)}
+                  onClick={() => {
+                    setActiveTab(tab.id as TabType);
+                    if (tab.id === 'admin') {
+                      window.location.hash = '#/admin';
+                      setCurrentPath('/admin');
+                    } else if (tab.id === 'vendas') {
+                      window.location.hash = '#/vendas';
+                      setCurrentPath('/vendas');
+                    } else {
+                      if (window.location.hash && window.location.hash !== '#/') {
+                        window.location.hash = '#/';
+                        setCurrentPath('/');
+                      }
+                    }
+                  }}
                   className={`flex items-center gap-2 px-4.5 py-3 text-sm font-semibold rounded-t-xl transition-all border-b-2 cursor-pointer whitespace-nowrap ${
                     isActive 
                       ? 'border-indigo-600 bg-indigo-50/30 text-indigo-700' 

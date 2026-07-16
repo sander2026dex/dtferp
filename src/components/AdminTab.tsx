@@ -21,7 +21,8 @@ import {
   Grid3X3,
   Search,
   Zap,
-  RefreshCw
+  RefreshCw,
+  MessageSquare
 } from 'lucide-react';
 import { 
   getGlobalUsers, 
@@ -30,6 +31,7 @@ import {
   saveGlobalSerials, 
   generateSerialKey, 
   registerUser,
+  deleteGlobalUser,
   UserAccount,
   SerialKey
 } from '../utils/db';
@@ -106,6 +108,52 @@ export default function AdminTab() {
       alert(`Dispositivo físico liberado com sucesso para o serial ${serialKeyStr}! O usuário poderá logar a partir de qualquer nova máquina.`);
       refreshData();
     }
+  };
+
+  // Delete user account permanently
+  const handleDeleteUser = (email: string, name: string) => {
+    const lowerEmail = email.toLowerCase();
+    if (lowerEmail === 'admin@dtf.com' || lowerEmail === 'xboxcarioca@gmail.com') {
+      alert('Não é possível excluir a conta de administrador mestra do sistema.');
+      return;
+    }
+    if (confirm(`⚠️ ATENÇÃO: Tem certeza que deseja EXCLUIR permanentemente o cliente ${name} (${email})?\n\nIsso apagará em definitivo seu registro de acesso e todos os dados salvos em nuvem de custos, produtos, clientes e vendas.`)) {
+      deleteGlobalUser(email);
+      refreshData();
+    }
+  };
+
+  // Customizable billing message template
+  const [billingTemplate, setBillingTemplate] = useState(() => {
+    return localStorage.getItem('dtf_billing_template') || 
+      `Olá, {nome}! 🚀\n\nIdentificamos que está na hora de renovar sua assinatura do *Sistema DTF Têxtil* para continuarmos juntos com força total! 📈\n\n*Vamos renovar?*\n📧 Usuário de Acesso: {email}\n💰 Valor da Licença: R$ 25,00/mês\n\n🔑 *Chave PIX de Renovação (Celular):* 11943152441 (Roberto)\n\nSeu acesso em nuvem garante salvamento individual de orçamentos, estoque e painel de vendas. Assim que realizar a transferência, basta enviar o comprovante por aqui!\n\nBoas vendas e muito sucesso! 🤝`;
+  });
+
+  const handleSaveTemplate = (text: string) => {
+    setBillingTemplate(text);
+    localStorage.setItem('dtf_billing_template', text);
+  };
+
+  // WhatsApp Billing
+  const handleWhatsAppBilling = (user: UserAccount) => {
+    const text = billingTemplate
+      .replace(/{nome}/g, user.nome)
+      .replace(/{email}/g, user.email);
+    
+    const cleanPhone = user.celular.replace(/\D/g, '');
+    const phoneWithCountry = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    window.open(`https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  // Email Billing
+  const handleEmailBilling = (user: UserAccount) => {
+    const text = billingTemplate
+      .replace(/{nome}/g, user.nome)
+      .replace(/{email}/g, user.email);
+      
+    const subject = encodeURIComponent('Renovação da Assinatura - Planilha DTF Têxtil 🚀');
+    const body = encodeURIComponent(text);
+    window.open(`mailto:${user.email}?subject=${subject}&body=${body}`, '_blank');
   };
 
   // Toggle user status manually
@@ -341,6 +389,29 @@ export default function AdminTab() {
             </div>
           </div>
 
+          {/* Configuração de Mensagem de Cobrança / Renovação */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 font-display flex items-center gap-2 pb-2 border-b border-slate-100">
+              <MessageSquare className="w-4 h-4 text-indigo-600" /> Mensagem de Cobrança / Renovação
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Personalize o texto que será usado para cobrança direta via WhatsApp ou E-mail. Use as tags dinâmicas <strong className="text-slate-600">{`{nome}`}</strong> e <strong className="text-slate-600">{`{email}`}</strong> para substituição automática do destinatário.
+            </p>
+            <div className="space-y-2">
+              <textarea
+                value={billingTemplate}
+                onChange={(e) => handleSaveTemplate(e.target.value)}
+                rows={7}
+                placeholder="Insira a mensagem de cobrança..."
+                className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700 font-sans leading-relaxed resize-y"
+              />
+              <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium">
+                <span>Salvamento automático ativo</span>
+                <span>Contém frase: <strong className="text-indigo-600">vamos renovar</strong></span>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         {/* Right Side: Registered clients & Multi-device control list */}
@@ -440,12 +511,12 @@ export default function AdminTab() {
                           <span className="text-slate-450 italic text-[10px]">Sem Chave Pro</span>
                         )}
                       </td>
-                      <td className="py-3.5 text-right space-y-1.5">
-                        <div className="flex justify-end gap-1.5">
+                      <td className="py-3.5 text-right">
+                        <div className="flex justify-end gap-1.5 flex-wrap">
                           {/* Toggle access activation */}
                           <button
                             onClick={() => handleToggleUserStatus(u.email, u.status)}
-                            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                            className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
                               isBlocked 
                                 ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100' 
                                 : 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100'
@@ -459,12 +530,39 @@ export default function AdminTab() {
                           {hasDeviceBound && (
                             <button
                               onClick={() => handleResetDeviceLock(u.email, u.serialKey)}
-                              className="p-1.5 bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-all cursor-pointer"
+                              className="p-1.5 bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-all cursor-pointer flex items-center justify-center"
                               title="Resetar Trava de Dispositivo Físico"
                             >
                               <Unlock className="w-3.5 h-3.5" />
                             </button>
                           )}
+
+                          {/* WhatsApp Billing */}
+                          <button
+                            onClick={() => handleWhatsAppBilling(u)}
+                            className="p-1.5 bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-all cursor-pointer flex items-center justify-center"
+                            title="Cobrar via WhatsApp"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Email Billing */}
+                          <button
+                            onClick={() => handleEmailBilling(u)}
+                            className="p-1.5 bg-sky-50 border border-sky-200 text-sky-600 hover:bg-sky-100 rounded-lg transition-all cursor-pointer flex items-center justify-center"
+                            title="Cobrar via E-mail"
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Exclude Client */}
+                          <button
+                            onClick={() => handleDeleteUser(u.email, u.nome)}
+                            className="p-1.5 bg-red-55/60 border border-red-200 text-red-600 hover:bg-red-100 rounded-lg transition-all cursor-pointer flex items-center justify-center"
+                            title="Excluir Cliente Permanentemente"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>

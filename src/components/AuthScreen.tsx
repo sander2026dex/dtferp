@@ -51,7 +51,20 @@ export default function AuthScreen({ onAuthSuccess, onGoBack, initialMode = 'log
 
   // Check URL query parameters for preloaded salesperson or user credentials
   React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const searchPart = window.location.search;
+    const hashPart = window.location.hash;
+    let queryStr = searchPart;
+    if (hashPart.includes('?')) {
+      queryStr = hashPart.substring(hashPart.indexOf('?'));
+    } else if (!queryStr && window.location.href.includes('?')) {
+      // Fallback if there is any other query string structure
+      const parts = window.location.href.split('?');
+      if (parts.length > 1) {
+        queryStr = '?' + parts[1];
+      }
+    }
+    
+    const params = new URLSearchParams(queryStr);
     const pEmail = params.get('vEmail') || params.get('email');
     const pPass = params.get('vPass') || params.get('senha') || params.get('password');
     const isV = params.get('vendedor') === 'true' || params.get('isVendedor') === 'true';

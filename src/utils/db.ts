@@ -189,6 +189,36 @@ export function updateGlobalUser(email: string, updates: Partial<UserAccount>): 
   return updatedUser;
 }
 
+// Delete global user helper
+export function deleteGlobalUser(email: string): boolean {
+  const users = getGlobalUsers();
+  const lowerEmail = email.toLowerCase();
+  const index = users.findIndex(u => u.email.toLowerCase() === lowerEmail);
+  if (index === -1) return false;
+
+  const user = users[index];
+  
+  // Unbind serial if associated
+  if (user.serialKey) {
+    const serials = getGlobalSerials();
+    const foundSerial = serials.find(s => s.key === user.serialKey);
+    if (foundSerial) {
+      foundSerial.status = 'available';
+      foundSerial.assignedTo = undefined;
+      foundSerial.deviceId = undefined;
+      saveGlobalSerials(serials);
+    }
+  }
+
+  // Remove user from global list
+  users.splice(index, 1);
+  saveGlobalUsers(users);
+
+  // Clear local storage database for this user
+  localStorage.removeItem(`dtf_user_db_${lowerEmail}`);
+  return true;
+}
+
 // Registration function
 export function registerUser(
   nome: string, 
